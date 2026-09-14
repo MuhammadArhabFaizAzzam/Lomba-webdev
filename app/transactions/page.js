@@ -26,6 +26,34 @@ export default function TransactionsPage() {
     tx.payment.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const exportToCSV = () => {
+    if (filteredTransactions.length === 0) return;
+
+    const headers = ['ID Transaksi', 'Waktu', 'Detail Item', 'Metode Pembayaran', 'Total'];
+    const rows = filteredTransactions.map(tx => [
+      tx.id,
+      tx.date,
+      `"${tx.items.replace(/"/g, '""')}"`, // Escape quotes in item list
+      tx.payment,
+      tx.total
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `laporan-transaksi-umkm-pro-${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Header */}
@@ -34,7 +62,17 @@ export default function TransactionsPage() {
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Riwayat Transaksi</h2>
           <p className="text-slate-500 text-sm font-normal">Daftar seluruh transaksi penjualan yang tercatat secara digital oleh sistem POS.</p>
         </div>
-        <div className="w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <button
+            onClick={exportToCSV}
+            disabled={filteredTransactions.length === 0}
+            className="w-full sm:w-auto flex items-center justify-center space-x-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-xl shadow-md shadow-emerald-600/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span>Export CSV</span>
+          </button>
           <input
             type="text"
             placeholder="Cari ID / Item / Metode..."
