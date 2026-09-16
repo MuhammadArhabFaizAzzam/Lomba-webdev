@@ -7,3 +7,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# Zenith POS Architecture & Agent Guidelines
+
+Refer to `docs/SYSTEM_DOCUMENTATION.md` for complete architecture details regarding Role-Based Access Control (RBAC), Inventory stock thresholds, price input formatting, CSV export, and thermal receipt printing.
+

@@ -31,23 +31,24 @@ export default function TransactionsPage() {
 
     const headers = ['ID Transaksi', 'Waktu', 'Detail Item', 'Metode Pembayaran', 'Total'];
     const rows = filteredTransactions.map(tx => [
-      tx.id,
-      tx.date,
-      `"${tx.items.replace(/"/g, '""')}"`, // Escape quotes in item list
-      tx.payment,
-      tx.total
+      `"${String(tx.id).replace(/"/g, '""')}"`,
+      `"${String(tx.date).replace(/"/g, '""')}"`,
+      `"${String(tx.items).replace(/"/g, '""')}"`,
+      `"${String(tx.payment).replace(/"/g, '""')}"`,
+      `"${String(tx.total)}"`
     ]);
 
     const csvContent = [
-      headers.join(','),
+      headers.map(h => `"${h}"`).join(','),
       ...rows.map(row => row.join(','))
-    ].join('\n');
+    ].join('\r\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Add UTF-8 BOM (\uFEFF) for Excel compatibility
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `laporan-transaksi-umkm-pro-${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `laporan-transaksi-zenith-pos-${new Date().toISOString().slice(0, 10)}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();

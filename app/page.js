@@ -12,6 +12,8 @@ export default function Dashboard() {
   });
   const [recentTransactions, setRecentTransactions] = useState([]);
   const [lowStockItems, setLowStockItems] = useState([]);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
   const [salesChartData, setSalesChartData] = useState([
     { day: 'Sen', amount: 0 },
     { day: 'Sel', amount: 0 },
@@ -22,6 +24,11 @@ export default function Dashboard() {
     { day: 'Min', amount: 0 },
   ]);
 
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 3500);
+  };
+
   const loadDashboardData = () => {
     const savedProducts = localStorage.getItem('zenith_products') || localStorage.getItem('umkm_products');
     const savedTransactions = localStorage.getItem('zenith_transactions') || localStorage.getItem('umkm_transactions');
@@ -30,7 +37,7 @@ export default function Dashboard() {
     const transactions = savedTransactions ? JSON.parse(savedTransactions) : [];
 
     const rev = transactions.reduce((acc, curr) => acc + curr.total, 0);
-    const lowStock = products.filter(p => p.stock <= 5);
+    const lowStock = products.filter(p => p.stock >= 1 && p.stock <= 20);
 
     setStats({
       totalRevenue: rev,
@@ -79,14 +86,13 @@ export default function Dashboard() {
   }, []);
 
   const handleResetData = () => {
-    if (confirm('Yakin ingin mereset seluruh data ke kondisi awal (0)? Semua produk dan transaksi akan dikosongkan.')) {
-      localStorage.removeItem('zenith_products');
-      localStorage.removeItem('zenith_transactions');
-      localStorage.removeItem('umkm_products');
-      localStorage.removeItem('umkm_transactions');
-      loadDashboardData();
-      alert('Aplikasi berhasil direset ke kondisi nol (0). Silakan mulai uji coba dari awal.');
-    }
+    localStorage.removeItem('zenith_products');
+    localStorage.removeItem('zenith_transactions');
+    localStorage.removeItem('umkm_products');
+    localStorage.removeItem('umkm_transactions');
+    loadDashboardData();
+    setShowResetModal(false);
+    showToast('Aplikasi berhasil direset ke kondisi awal (0).');
   };
 
   const formatRupiah = (number) => {

@@ -8,12 +8,18 @@ export default function POSPage() {
   const [cart, setCart] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('QRIS');
   const [successMessage, setSuccessMessage] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   
   // Receipt modal state
   const [receiptData, setReceiptData] = useState(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 3500);
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem('zenith_products') || localStorage.getItem('umkm_products');
@@ -30,7 +36,7 @@ export default function POSPage() {
 
   const addToCart = (product) => {
     if (product.stock <= 0) {
-      alert('Stok produk habis!');
+      showToast('Stok produk habis!');
       return;
     }
 
@@ -38,7 +44,7 @@ export default function POSPage() {
       const existing = prevCart.find((item) => item.id === product.id);
       if (existing) {
         if (existing.qty >= product.stock) {
-          alert('Jumlah melebihi stok tersedia di gudang!');
+          showToast('Jumlah melebihi stok tersedia di gudang!');
           return prevCart;
         }
         return prevCart.map((item) =>
@@ -62,7 +68,7 @@ export default function POSPage() {
           const newQty = item.qty + delta;
           if (newQty <= 0) return null;
           if (newQty > product.stock) {
-            alert('Melebihi stok gudang!');
+            showToast('Melebihi stok gudang!');
             return item;
           }
           return { ...item, qty: newQty };
@@ -82,7 +88,11 @@ export default function POSPage() {
     const total = calculateTotal();
     const trxId = 'TRX-' + Math.floor(1000 + Math.random() * 9000);
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5);
+    const dateStr = now.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }) + ' ' + now.toTimeString().slice(0, 5);
 
     const itemsSummary = cart.map((i) => `${i.name} (${i.qty})`).join(', ');
 
@@ -123,6 +133,33 @@ export default function POSPage() {
     setTimeout(() => {
       setSuccessMessage('');
     }, 4000);
+  };
+
+  const handlePrintReceipt = () => {
+    window.print();
+  };
+
+  // Stock status badge helper
+  const getStockBadge = (stock) => {
+    if (stock === 0) {
+      return (
+        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+          Stok Kosong
+        </span>
+      );
+    } else if (stock >= 1 && stock <= 20) {
+      return (
+        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+          Stok Menipis ({stock})
+        </span>
+      );
+    } else {
+      return (
+        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          Stok Normal ({stock})
+        </span>
+      );
+    }
   };
 
   const categories = ['Semua', 'Makanan', 'Minuman', 'Cemilan', 'Lainnya'];
@@ -199,106 +236,109 @@ export default function POSPage() {
               </Link>
             </div>
           ) : filteredProducts.length === 0 ? (
-            <div className="col-span-full py-12 text-center text-slate-400 text-sm">
+            <div className="col-span-full py-12 bg-white rounded-2xl border border-slate-200 text-center text-slate-400 text-sm font-medium">
               Tidak ada produk yang cocok dengan pencarian.
             </div>
           ) : (
-            filteredProducts.map((product) => (
-              <div
-                key={product.id}
-                onClick={() => addToCart(product)}
-                className={`bg-white p-5 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                  product.stock === 0
-                    ? 'opacity-60 bg-slate-100 border-slate-200 cursor-not-allowed'
-                    : 'border-slate-200 hover:shadow-lg hover:border-indigo-400 group'
-                }`}
-              >
-                <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-md">
-                      {product.category}
-                    </span>
-                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${product.stock <= 5 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}>
-                      Stok: {product.stock}
+            filteredProducts.map((p) => {
+              const isOutOfStock = p.stock <= 0;
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => !isOutOfStock && addToCart(p)}
+                  className={`bg-white p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between ${
+                    isOutOfStock
+                      ? 'opacity-60 cursor-not-allowed border-slate-200 bg-slate-50'
+                      : 'cursor-pointer hover:border-indigo-500 hover:shadow-md border-slate-200 group'
+                  }`}
+                >
+                  <div>
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
+                        {p.category}
+                      </span>
+                      {getStockBadge(p.stock)}
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-800 mb-1 group-hover:text-indigo-600 transition-colors">
+                      {p.name}
+                    </h3>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-sm font-extrabold text-indigo-600">{formatRupiah(p.price)}</span>
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${isOutOfStock ? 'bg-slate-200 text-slate-500' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors'}`}>
+                      {isOutOfStock ? 'Habis' : '+ Tambah'}
                     </span>
                   </div>
-                  <h3 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-indigo-600 transition">{product.name}</h3>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="font-extrabold text-indigo-600 text-sm">{formatRupiah(product.price)}</span>
-                  <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
-                    +
-                  </span>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
 
-      {/* Cart / Checkout Panel */}
-      <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 flex flex-col justify-between h-fit sticky top-6">
-        <div>
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
-            <h3 className="text-base font-bold text-slate-800">Keranjang Belanja</h3>
-            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-lg">
-              {cart.reduce((a, c) => a + c.qty, 0)} Item
+      {/* Shopping Cart & Checkout Sidebar (Non-scrollable container requirement) */}
+      <div className="space-y-6">
+        <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200 flex flex-col">
+          <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-4">
+            <h3 className="text-base font-bold text-slate-800">Keranjang Pesanan</h3>
+            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg">
+              {cart.reduce((sum, item) => sum + item.qty, 0)} Item
             </span>
           </div>
 
-          {cart.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 text-xs font-medium">
-              Keranjang masih kosong.<br />Pilih produk dari katalog di samping.
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-              {cart.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl border border-slate-100">
-                  <div className="flex-1 pr-2">
-                    <h4 className="font-semibold text-slate-800 text-xs truncate">{item.name}</h4>
-                    <span className="text-xs text-indigo-600 font-semibold">{formatRupiah(item.price)}</span>
+          {/* Cart Items List - Non-Scrollable Container */}
+          <div className="space-y-3 mb-6">
+            {cart.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs font-medium">
+                Keranjang masih kosong. Pilih produk dari katalog di samping.
+              </div>
+            ) : (
+              cart.map((item) => (
+                <div key={item.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs font-bold text-slate-800 truncate">{item.name}</h4>
+                    <p className="text-[11px] text-indigo-600 font-extrabold">{formatRupiah(item.price)}</p>
                   </div>
-                  <div className="flex items-center space-x-1.5">
+                  <div className="flex items-center space-x-1.5 shrink-0">
                     <button
                       onClick={() => updateQty(item.id, -1)}
-                      className="w-6 h-6 rounded-md bg-white border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center hover:bg-slate-100"
+                      className="w-6 h-6 bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 text-xs font-bold rounded border border-slate-200 transition"
                     >
                       -
                     </button>
-                    <span className="text-xs font-bold w-5 text-center">{item.qty}</span>
+                    <span className="w-6 text-center text-xs font-bold text-slate-800">{item.qty}</span>
                     <button
                       onClick={() => updateQty(item.id, 1)}
-                      className="w-6 h-6 rounded-md bg-white border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center hover:bg-slate-100"
+                      className="w-6 h-6 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-600 text-xs font-bold rounded border border-slate-200 transition"
                     >
                       +
                     </button>
                     <button
                       onClick={() => removeFromCart(item.id)}
-                      className="text-rose-500 hover:text-rose-700 text-xs ml-1 p-1 font-bold"
+                      className="ml-1 text-slate-400 hover:text-rose-600 p-1 transition"
+                      title="Hapus"
                     >
                       &times;
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              ))
+            )}
+          </div>
 
-        <div className="mt-6 pt-4 border-t border-slate-100 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-              Metode Pembayaran
-            </label>
+          {/* Payment Method Selection */}
+          <div className="space-y-2 mb-6 pt-4 border-t border-slate-100">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">Metode Pembayaran</label>
             <div className="grid grid-cols-3 gap-2">
               {['QRIS', 'Tunai', 'Transfer'].map((method) => (
                 <button
                   key={method}
+                  type="button"
                   onClick={() => setPaymentMethod(method)}
-                  className={`py-2 rounded-xl text-xs font-semibold border transition ${
+                  className={`py-2 rounded-xl text-xs font-bold border transition ${
                     paymentMethod === method
                       ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   {method}
@@ -307,93 +347,103 @@ export default function POSPage() {
             </div>
           </div>
 
-          <div className="flex justify-between items-center text-base font-bold text-slate-800 pt-1">
-            <span>Total Pembayaran:</span>
-            <span className="text-indigo-600 text-lg">{formatRupiah(calculateTotal())}</span>
+          {/* Summary & Checkout */}
+          <div className="pt-4 border-t border-slate-100 space-y-3">
+            <div className="flex justify-between items-center text-sm font-bold text-slate-900">
+              <span>Total Pembayaran:</span>
+              <span className="text-lg font-extrabold text-indigo-600">{formatRupiah(calculateTotal())}</span>
+            </div>
+            <button
+              onClick={handleCheckout}
+              disabled={cart.length === 0}
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Proses Checkout & Cetak Struk</span>
+            </button>
           </div>
-
-          <button
-            onClick={handleCheckout}
-            disabled={cart.length === 0}
-            className={`w-full py-3 px-4 rounded-xl font-bold text-xs text-white shadow-md transition ${
-              cart.length === 0
-                ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30'
-            }`}
-          >
-            Proses Pembayaran & Cetak Struk
-          </button>
         </div>
       </div>
 
-      {/* Thermal Receipt Modal */}
+      {/* Professional Thermal Receipt Modal */}
       {showReceiptModal && receiptData && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 flex flex-col">
-            <div className="text-center pb-4 border-b border-dashed border-slate-300">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white font-bold text-lg flex items-center justify-center mx-auto mb-2 shadow-md">
-                Z
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn print:p-0 print:bg-white print:static">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 print:shadow-none print:border-none print:w-full print:max-w-none font-mono text-slate-800">
+            {/* Receipt Printable Area */}
+            <div id="printable-receipt" className="space-y-4">
+              <div className="text-center pb-3 border-b border-dashed border-slate-300">
+                <h3 className="text-lg font-black tracking-tight text-slate-900">ZENITH POS RETAIL</h3>
+                <p className="text-[11px] text-slate-500">Pusat Grosir & Eceran UMKM Professional</p>
               </div>
-              <h3 className="font-extrabold text-slate-900 text-base">ZENITH POS RECEIPT</h3>
-              <p className="text-[11px] text-slate-500">Professional Retail Solution</p>
-            </div>
 
-            <div className="py-4 space-y-2 text-xs text-slate-600 border-b border-dashed border-slate-300">
-              <div className="flex justify-between">
-                <span>No. Transaksi:</span>
-                <span className="font-bold text-slate-800">{receiptData.id}</span>
+              <div className="text-xs space-y-1 pb-3 border-b border-dashed border-slate-300">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">No. Transaksi:</span>
+                  <span className="font-bold text-indigo-600">{receiptData.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Waktu:</span>
+                  <span className="font-medium text-slate-700">{receiptData.date}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Metode Bayar:</span>
+                  <span className="font-bold text-slate-800">{receiptData.payment}</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Waktu:</span>
-                <span className="font-medium text-slate-800">{receiptData.date}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Metode Bayar:</span>
-                <span className="font-semibold text-indigo-600">{receiptData.payment}</span>
-              </div>
-            </div>
 
-            <div className="py-4 space-y-2 max-h-48 overflow-y-auto border-b border-dashed border-slate-300">
-              {receiptData.cartItems ? (
-                receiptData.cartItems.map((ci, idx) => (
-                  <div key={idx} className="flex justify-between text-xs">
-                    <div className="pr-2">
-                      <p className="font-semibold text-slate-800">{ci.name}</p>
-                      <p className="text-[11px] text-slate-400">{ci.qty} x {formatRupiah(ci.price)}</p>
-                    </div>
-                    <span className="font-bold text-slate-800 self-center">{formatRupiah(ci.qty * ci.price)}</span>
+              {/* Items Table */}
+              <div className="space-y-3 pb-3 border-b border-dashed border-slate-300 text-xs">
+                <div className="text-[10px] uppercase font-bold text-slate-400 grid grid-cols-12 gap-1 pb-1">
+                  <span className="col-span-5">Nama Barang</span>
+                  <span className="col-span-3 text-center">Harga @</span>
+                  <span className="col-span-1 text-center">Qty</span>
+                  <span className="col-span-3 text-right">Subtotal</span>
+                </div>
+                {receiptData.cartItems.map((item, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-1 items-center text-xs">
+                    <span className="col-span-5 font-medium truncate">{item.name}</span>
+                    <span className="col-span-3 text-center text-slate-600">{formatRupiah(item.price)}</span>
+                    <span className="col-span-1 text-center font-bold text-slate-800">{item.qty}</span>
+                    <span className="col-span-3 text-right font-bold text-indigo-600">{formatRupiah(item.price * item.qty)}</span>
                   </div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-600">{receiptData.items}</p>
-              )}
-            </div>
+                ))}
+              </div>
 
-            <div className="py-4 space-y-1.5 border-b border-dashed border-slate-300">
-              <div className="flex justify-between text-sm font-extrabold text-slate-900">
-                <span>TOTAL:</span>
-                <span className="text-indigo-600">{formatRupiah(receiptData.total)}</span>
+              {/* Total */}
+              <div className="space-y-1.5 pb-4 border-b border-dashed border-slate-300 text-sm">
+                <div className="flex justify-between font-extrabold text-slate-900 text-base pt-1">
+                  <span>TOTAL:</span>
+                  <span className="text-indigo-600">{formatRupiah(receiptData.total)}</span>
+                </div>
+              </div>
+
+              {/* Footer / Thank you */}
+              <div className="text-center pt-2 space-y-1">
+                <p className="text-xs font-bold text-slate-800">TERIMA KASIH TELAH BERBELANJA</p>
+                <p className="text-[10px] text-slate-500">Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.</p>
               </div>
             </div>
 
-            <div className="text-center py-3 text-[11px] text-slate-400">
-              Terima Kasih atas Kunjungan Anda!<br />Barang yang sudah dibeli tidak dapat ditukar.
-            </div>
-
-            <div className="flex space-x-2 pt-2">
+            {/* Modal Action Buttons (Hidden on print) */}
+            <div className="mt-6 pt-4 border-t border-slate-100 flex space-x-3 print:hidden">
               <button
-                onClick={() => {
-                  window.print();
-                }}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition"
-              >
-                Cetak Struk
-              </button>
-              <button
+                type="button"
                 onClick={() => setShowReceiptModal(false)}
-                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 font-semibold text-xs hover:bg-slate-50 transition"
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
               >
                 Tutup
+              </button>
+              <button
+                type="button"
+                onClick={handlePrintReceipt}
+                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/30 transition flex items-center justify-center space-x-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                <span>Cetak Struk (PDF)</span>
               </button>
             </div>
           </div>
