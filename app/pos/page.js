@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -11,24 +11,25 @@ export default function POSPage() {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('QRIS');
+  const [toastMessage, setToastMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [themeMode, setThemeMode] = useState('dark');
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptData, setReceiptData] = useState(null);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 3500);
+  };
 
   useEffect(() => {
     const savedProducts = localStorage.getItem('zenith_products') || localStorage.getItem('umkm_products');
     const parsedProducts = savedProducts ? JSON.parse(savedProducts) : [];
-    const loadProducts = window.setTimeout(() => setProducts(parsedProducts), 0);
+    setProducts(parsedProducts);
 
     const savedTheme = localStorage.getItem('zenith_pos_theme');
-    const loadTheme = savedTheme
-      ? window.setTimeout(() => setThemeMode(savedTheme), 0)
-      : undefined;
-
-    return () => {
-      window.clearTimeout(loadProducts);
-      if (loadTheme) window.clearTimeout(loadTheme);
-    };
+    setThemeMode(savedTheme || 'dark');
   }, []);
 
   useEffect(() => {
@@ -44,54 +45,77 @@ export default function POSPage() {
     });
   }, [products, searchQuery, selectedCategory]);
 
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const tax = subtotal * 0.11;
-  const grandTotal = subtotal + tax;
+  const calculateTotal = () => cart.reduce((sum, item) => sum + item.price * item.qty, 0);
 
   const addToCart = (product) => {
-    if (product.stock <= 0) return;
+    if (product.stock <= 0) {
+      showToast('Stok produk habis!');
+      return;
+    }
+
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.id === product.id);
       if (existing) {
-        if (existing.qty >= product.stock) return prevCart;
-        return prevCart.map((item) => item.id === product.id ? { ...item, qty: item.qty + 1 } : item);
+        if (existing.qty >= product.stock) {
+          showToast('Jumlah melebihi stok tersedia di gudang!');
+          return prevCart;
+        }
+        return prevCart.map((item) =>
+          item.id === product.id ? { ...item, qty: item.qty + 1 } : item,
+        );
       }
       return [...prevCart, { ...product, qty: 1 }];
     });
   };
 
   const updateQty = (productId, delta) => {
-    setCart((prevCart) =>
-      prevCart
-        .map((item) => {
-          if (item.id !== productId) return item;
-          const nextQty = item.qty + delta;
-          if (nextQty <= 0) return null;
-          return { ...item, qty: nextQty };
-        })
-        .filter(Boolean)
-    );
+    setCart((prevCart) => {
+      return prevCart.flatMap((item) => {
+        if (item.id !== productId) return [item];
+        const product = products.find((p) => p.id === productId);
+        const nextQty = item.qty + delta;
+
+        if (nextQty <= 0) return [];
+        if (product && nextQty > product.stock) {
+          showToast('Melebihi stok gudang!');
+          return [item];
+        }
+        return [{ ...item, qty: nextQty }];
+      });
+    });
   };
 
-  const removeItem = (productId) => {
+  const removeFromCart = (productId) => {
     setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
   };
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
 
+    const total = calculateTotal();
     const now = new Date();
-    const trxId = `TRX-${now.getTime().toString().slice(-6)}`;
+    const transactionId = `TRX-${now.getTime()}`;
+    const dateStr = now.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }) + ' ' + now.toTimeString().slice(0, 5);
+
     const transaction = {
-      id: trxId,
-      date: now.toISOString().slice(0, 10),
-      items: cart.map((item) => `${item.name} (${item.qty})`).join(', '),
-      total: grandTotal,
+      id: transactionId,
+      date: dateStr,
       payment: paymentMethod,
+      total,
+      items: cart.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        qty: item.qty,
+      })),
     };
 
-    const saved = localStorage.getItem('zenith_transactions') || localStorage.getItem('umkm_transactions');
-    const currentTransactions = saved ? JSON.parse(saved) : [];
+    const savedTransactions = localStorage.getItem('zenith_transactions') || localStorage.getItem('umkm_transactions');
+    const currentTransactions = savedTransactions ? JSON.parse(savedTransactions) : [];
     const nextTransactions = [transaction, ...currentTransactions];
     localStorage.setItem('zenith_transactions', JSON.stringify(nextTransactions));
     localStorage.setItem('umkm_transactions', JSON.stringify(nextTransactions));
@@ -105,13 +129,40 @@ export default function POSPage() {
     setProducts(updatedProducts);
     localStorage.setItem('zenith_products', JSON.stringify(updatedProducts));
     localStorage.setItem('umkm_products', JSON.stringify(updatedProducts));
+
+    setReceiptData({
+      id: transaction.id,
+      date: transaction.date,
+      payment: transaction.payment,
+      total: transaction.total,
+      cartItems: transaction.items,
+    });
+    setShowReceiptModal(true);
     setCart([]);
   };
 
-  const paymentMethods = ['QRIS', 'Cash', 'Transfer', 'E-Wallet'];
+  const handlePrintReceipt = () => {
+    window.print();
+  };
+
+  const getStockBadge = (stock) => {
+    if (stock === 0) {
+      return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">Stok Kosong</span>;
+    }
+    if (stock >= 1 && stock <= 20) {
+      return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Stok Menipis ({stock})</span>;
+    }
+    return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Stok Normal ({stock})</span>;
+  };
 
   return (
     <div className="pos-shell">
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce">
+          {toastMessage}
+        </div>
+      )}
+
       <div className="pos-area">
         <div className="pos-toolbar">
           <div>
@@ -165,12 +216,7 @@ export default function POSPage() {
         ) : (
           <div className="product-grid" style={{ marginTop: 18 }}>
             {filteredProducts.map((product) => (
-              <button
-                key={product.id}
-                type="button"
-                className="tap-card"
-                onClick={() => addToCart(product)}
-              >
+              <button key={product.id} type="button" className="tap-card" onClick={() => addToCart(product)}>
                 <div className="product-head">
                   <div>
                     <div className="product-meta">{product.category}</div>
@@ -201,81 +247,144 @@ export default function POSPage() {
           <button className="pill-button" type="button" onClick={() => setCart([])}>Reset</button>
         </div>
 
-        <div className="cart-items">
-          {cart.length === 0 ? (
-            <div className="empty-state">Keranjang masih kosong.</div>
-          ) : (
-            cart.map((item) => (
-              <div key={item.id} className="cart-row">
-                <div>
-                  <div className="cart-item-name">{item.name}</div>
-                  <div className="quick-value">{formatRupiah(item.price)} / pcs</div>
-                </div>
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200 flex flex-col">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-4">
+              <h3 className="text-base font-bold text-slate-800">Keranjang Pesanan</h3>
+              <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg">
+                {cart.reduce((sum, item) => sum + item.qty, 0)} Item
+              </span>
+            </div>
 
-                <div className="cart-qty">
-                  <button className="qty-button" type="button" onClick={() => updateQty(item.id, -1)} disabled={item.qty <= 1}>
-                    <Minus size={12} />
-                  </button>
-                  <span>{item.qty}</span>
-                  <button className="qty-button" type="button" onClick={() => updateQty(item.id, 1)}>
-                    <Plus size={12} />
-                  </button>
+            <div className="space-y-3 mb-6">
+              {cart.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-xs font-medium">
+                  Keranjang masih kosong. Pilih produk dari katalog di samping.
                 </div>
+              ) : (
+                cart.map((item) => (
+                  <div key={item.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-bold text-slate-800 truncate">{item.name}</h4>
+                      <p className="text-[11px] text-indigo-600 font-extrabold">{formatRupiah(item.price)}</p>
+                    </div>
+                    <div className="flex items-center space-x-1.5 shrink-0">
+                      <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 text-xs font-bold rounded border border-slate-200 transition">-</button>
+                      <span className="w-6 text-center text-xs font-bold text-slate-800">{item.qty}</span>
+                      <button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-600 text-xs font-bold rounded border border-slate-200 transition">+</button>
+                      <button onClick={() => removeFromCart(item.id)} className="ml-1 text-slate-400 hover:text-rose-600 p-1 transition" title="Hapus">&times;</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
 
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 700 }}>{formatRupiah(item.price * item.qty)}</div>
-                  <button type="button" onClick={() => removeItem(item.id)} style={{ marginTop: 4, color: 'var(--text-tertiary)' }}>
-                    <Trash2 size={12} />
+            <div className="space-y-2 mb-6 pt-4 border-t border-slate-100">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">Metode Pembayaran</label>
+              <div className="grid grid-cols-3 gap-2">
+                {['QRIS', 'Tunai', 'Transfer'].map((method) => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => setPaymentMethod(method)}
+                    className={`py-2 rounded-xl text-xs font-bold border transition ${
+                      paymentMethod === method
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {method}
                   </button>
-                </div>
+                ))}
               </div>
-            ))
-          )}
-        </div>
+            </div>
 
-        <div className="cart-total">
-          <div className="total-row">
-            <span>Subtotal</span>
-            <span>{formatRupiah(subtotal)}</span>
-          </div>
-          <div className="total-row">
-            <span>Pajak</span>
-            <span>{formatRupiah(tax)}</span>
-          </div>
-          <div className="total-row">
-            <span>Total</span>
-            <strong>{formatRupiah(grandTotal)}</strong>
-          </div>
-
-          <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 8 }}>Metode Pembayaran</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {paymentMethods.map((method) => (
-                <button
-                  key={method}
-                  type="button"
-                  className={`payment-button ${paymentMethod === method ? 'active' : ''}`}
-                  onClick={() => setPaymentMethod(method)}
-                  style={{
-                    background: paymentMethod === method ? 'var(--surface-2)' : 'rgba(255,255,255,0.02)',
-                    color: 'var(--text-primary)',
-                    border: paymentMethod === method ? '1px solid var(--accent-tertiary)' : '1px solid var(--border-default)',
-                    minWidth: 92,
-                    padding: '10px 12px',
-                    fontWeight: 700,
-                  }}
-                >
-                  {method}
-                </button>
-              ))}
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <div className="flex justify-between items-center text-sm font-bold text-slate-900">
+                <span>Total Pembayaran:</span>
+                <span className="text-lg font-extrabold text-indigo-600">{formatRupiah(calculateTotal())}</span>
+              </div>
+              <button
+                onClick={handleCheckout}
+                disabled={cart.length === 0}
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Proses Checkout & Cetak Struk</span>
+              </button>
             </div>
           </div>
-
-          <button type="button" className="checkout-button" onClick={handleCheckout} disabled={cart.length === 0}>
-            Proses Pembayaran / Checkout
-          </button>
         </div>
       </aside>
+
+      {showReceiptModal && receiptData && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn print:p-0 print:bg-white print:static">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 print:shadow-none print:border-none print:w-full print:max-w-none font-mono text-slate-800">
+            <div id="printable-receipt" className="space-y-4">
+              <div className="text-center pb-3 border-b border-dashed border-slate-300">
+                <h3 className="text-lg font-black tracking-tight text-slate-900">ZENITH POS RETAIL</h3>
+                <p className="text-[11px] text-slate-500">Pusat Grosir & Eceran UMKM Professional</p>
+              </div>
+
+              <div className="text-xs space-y-1 pb-3 border-b border-dashed border-slate-300">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">No. Transaksi:</span>
+                  <span className="font-bold text-indigo-600">{receiptData.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Waktu:</span>
+                  <span className="font-medium text-slate-700">{receiptData.date}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Metode Bayar:</span>
+                  <span className="font-bold text-slate-800">{receiptData.payment}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3 pb-3 border-b border-dashed border-slate-300 text-xs">
+                <div className="text-[10px] uppercase font-bold text-slate-400 grid grid-cols-12 gap-1 pb-1">
+                  <span className="col-span-5">Nama Barang</span>
+                  <span className="col-span-3 text-center">Harga @</span>
+                  <span className="col-span-1 text-center">Qty</span>
+                  <span className="col-span-3 text-right">Subtotal</span>
+                </div>
+                {receiptData.cartItems.map((item, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-1 items-center text-xs">
+                    <span className="col-span-5 font-medium truncate">{item.name}</span>
+                    <span className="col-span-3 text-center text-slate-600">{formatRupiah(item.price)}</span>
+                    <span className="col-span-1 text-center font-bold text-slate-800">{item.qty}</span>
+                    <span className="col-span-3 text-right font-bold text-indigo-600">{formatRupiah(item.price * item.qty)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-1.5 pb-4 border-b border-dashed border-slate-300 text-sm">
+                <div className="flex justify-between font-extrabold text-slate-900 text-base pt-1">
+                  <span>TOTAL:</span>
+                  <span className="text-indigo-600">{formatRupiah(receiptData.total)}</span>
+                </div>
+              </div>
+
+              <div className="text-center pt-2 space-y-1">
+                <p className="text-xs font-bold text-slate-800">TERIMA KASIH TELAH BERBELANJA</p>
+                <p className="text-[10px] text-slate-500">Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.</p>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100 flex space-x-3 print:hidden">
+              <button type="button" onClick={() => setShowReceiptModal(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">Tutup</button>
+              <button type="button" onClick={handlePrintReceipt} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/30 transition flex items-center justify-center space-x-1.5">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                <span>Cetak Struk (PDF)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

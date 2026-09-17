@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpRight,
@@ -58,6 +58,12 @@ export default function Dashboard() {
     totalProducts: 0,
     lowStockCount: 0,
   });
+  const [toastMessage, setToastMessage] = useState('');
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 3500);
+  };
 
   useEffect(() => {
     const savedProducts = localStorage.getItem('zenith_products') || localStorage.getItem('umkm_products');
@@ -69,14 +75,12 @@ export default function Dashboard() {
     const totalRevenue = transactions.reduce((sum, curr) => sum + Number(curr.total || 0), 0);
     const lowStockCount = products.filter((product) => Number(product.stock || 0) <= 5).length;
 
-    const updateStats = window.setTimeout(() => setStats({
+    setStats({
       totalRevenue,
       totalTransactions: transactions.length,
       totalProducts: products.length,
       lowStockCount,
-    }), 0);
-
-    return () => window.clearTimeout(updateStats);
+    });
   }, []);
 
   const metrics = [
@@ -104,6 +108,12 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-wrap">
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce">
+          {toastMessage}
+        </div>
+      )}
+
       <div className="dashboard-hero">
         <div className="hero-copy">
           <span className="eyebrow">Zenith POS Analytics Hub</span>

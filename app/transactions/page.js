@@ -26,6 +26,35 @@ export default function TransactionsPage() {
 
   const totalRevenue = transactions.reduce((sum, tx) => sum + Number(tx.total || 0), 0);
 
+  const exportToCSV = () => {
+    if (filteredTransactions.length === 0) return;
+
+    const headers = ['ID Transaksi', 'Waktu', 'Detail Item', 'Metode Pembayaran', 'Total'];
+    const rows = filteredTransactions.map(tx => [
+      `"${String(tx.id).replace(/"/g, '""')}"`,
+      `"${String(tx.date).replace(/"/g, '""')}"`,
+      `"${String(tx.items).replace(/"/g, '""')}"`,
+      `"${String(tx.payment).replace(/"/g, '""')}"`,
+      `"${String(tx.total)}"`
+    ]);
+
+    const csvContent = [
+      headers.map(h => `"${h}"`).join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\r\n');
+
+    // Add UTF-8 BOM (\uFEFF) for Excel compatibility
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `laporan-transaksi-zenith-pos-${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="page-stack">
       <div className="page-heading">
@@ -34,9 +63,24 @@ export default function TransactionsPage() {
           <h2>Riwayat Transaksi</h2>
           <p>Semua penjualan tercatat rapi agar mudah ditinjau dan ditindaklanjuti.</p>
         </div>
-        <div className="heading-stat">
-          <span>Total tercatat</span>
-          <strong>{formatRupiah(totalRevenue)}</strong>
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <button
+            onClick={exportToCSV}
+            disabled={filteredTransactions.length === 0}
+            className="w-full sm:w-auto flex items-center justify-center space-x-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-xl shadow-md shadow-emerald-600/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span>Export CSV</span>
+          </button>
+          <input
+            type="text"
+            placeholder="Cari ID / Item / Metode..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full sm:w-64 px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-white"
+          />
         </div>
       </div>
 
