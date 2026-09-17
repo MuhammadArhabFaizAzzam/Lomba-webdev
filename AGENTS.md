@@ -12,3 +12,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 Refer to `docs/SYSTEM_DOCUMENTATION.md` for complete architecture details regarding Role-Based Access Control (RBAC), Inventory stock thresholds, price input formatting, CSV export, and thermal receipt printing.
 
+## Key Engineering Rules & Recent Fixes
+1. **Product ID Integrity & Normalization:** On mount, `inventory/page.js` normalizes stored products, ensuring missing or duplicate IDs are repaired and deduplicated with unique collision-safe identifiers before writing back to `zenith_products` and `umkm_products`.
+2. **Kasir Dashboard Access:** Authenticated Kasir users are permitted to view the Dashboard Business page (`/`) while maintaining strict redirection / access-denied toast guards for `/inventory` and `/guide`.
+3. **Checkout Payment Reset:** Successfully completed POS checkouts automatically reset the selected payment method back to `QRIS` for subsequent transactions.
+
+

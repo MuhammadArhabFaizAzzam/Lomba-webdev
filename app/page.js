@@ -216,7 +216,7 @@ export default function Dashboard() {
             Real-time Analytics
           </span>
         </div>
-        <div className="h-48 flex items-end justify-between gap-2 pt-6 px-2 border-b border-slate-100">
+        <div className="h-48 lg:h-56 flex items-end justify-between gap-2 pt-6 px-2 border-b border-slate-100">
           {salesChartData.map((item, index) => {
             const heightPercent = maxChartAmount > 0 ? Math.round((item.amount / maxChartAmount) * 100) : 0;
             return (

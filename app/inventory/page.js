@@ -3,21 +3,122 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+// Built-in Indonesian Retail Presets
+const BUILT_IN_PRESETS = [
+  {
+    id: 'warung-sembako',
+    name: 'Warung Sembako',
+    description: 'Starter inventory for a typical Indonesian warung (staples & daily needs)',
+    products: [
+      { name: 'Indomie Goreng', category: 'Makanan', price: 3500, stock: 50 },
+      { name: 'Indomie Ayam Bawang', category: 'Makanan', price: 3500, stock: 40 },
+      { name: 'Mie Sedaap Goreng', category: 'Makanan', price: 3500, stock: 45 },
+      { name: 'Beras 5kg', category: 'Makanan', price: 65000, stock: 15 },
+      { name: 'Gula Pasir 1kg', category: 'Makanan', price: 17500, stock: 25 },
+      { name: 'Minyak Goreng 1L', category: 'Makanan', price: 18000, stock: 30 },
+      { name: 'Tepung Terigu 1kg', category: 'Makanan', price: 12500, stock: 20 },
+      { name: 'Telur Ayam (1kg)', category: 'Makanan', price: 28000, stock: 25 },
+      { name: 'Garam 500g', category: 'Makanan', price: 5000, stock: 35 },
+      { name: 'Kopi Kapal Api Sachet', category: 'Minuman', price: 2000, stock: 100 },
+      { name: 'Teh Celup Sosro', category: 'Minuman', price: 9000, stock: 20 },
+      { name: 'Kecap Manis Bango 60ml', category: 'Makanan', price: 5500, stock: 24 },
+      { name: 'Saus Sambal ABC', category: 'Makanan', price: 6000, stock: 18 },
+      { name: 'Air Mineral 600ml', category: 'Minuman', price: 3500, stock: 60 },
+    ],
+  },
+  {
+    id: 'mini-market',
+    name: 'Mini Market',
+    description: 'Modern convenience store assortment (beverages, snacks & personal care)',
+    products: [
+      { name: 'Aqua 600ml', category: 'Minuman', price: 4000, stock: 80 },
+      { name: 'Teh Botol Sosro 450ml', category: 'Minuman', price: 5500, stock: 50 },
+      { name: 'Coca-Cola 390ml', category: 'Minuman', price: 7000, stock: 40 },
+      { name: 'Sprite 390ml', category: 'Minuman', price: 7000, stock: 30 },
+      { name: 'Fanta 390ml', category: 'Minuman', price: 7000, stock: 30 },
+      { name: 'Indomie Goreng Special', category: 'Makanan', price: 3800, stock: 100 },
+      { name: 'Chitato Sapi Panggang', category: 'Cemilan', price: 11000, stock: 25 },
+      { name: 'Qtela Singkong Balado', category: 'Cemilan', price: 9000, stock: 20 },
+      { name: 'Oreo Vanila 119g', category: 'Cemilan', price: 10500, stock: 30 },
+      { name: 'Beng-Beng 20g', category: 'Cemilan', price: 2500, stock: 120 },
+      { name: 'SilverQueen Chocolate 62g', category: 'Cemilan', price: 21000, stock: 15 },
+      { name: 'Ultra Milk Cokelat 250ml', category: 'Minuman', price: 6500, stock: 45 },
+      { name: 'Yakult Pack (5 botol)', category: 'Minuman', price: 10500, stock: 20 },
+      { name: 'Tissue Paseo 250 sheets', category: 'Lainnya', price: 16000, stock: 30 },
+      { name: 'Lifebuoy Sabun Mandi', category: 'Lainnya', price: 4500, stock: 35 },
+      { name: 'Pepsodent Pasta Gigi 190g', category: 'Lainnya', price: 13500, stock: 25 },
+      { name: 'Clear Shampoo 160ml', category: 'Lainnya', price: 24000, stock: 15 },
+    ],
+  },
+  {
+    id: 'kantin-food-stall',
+    name: 'Kantin / Food Stall',
+    description: 'Ready-to-eat meals, snacks, and beverages for campus/office canteens',
+    products: [
+      { name: 'Nasi Putih Porsi', category: 'Makanan', price: 5000, stock: 40 },
+      { name: 'Nasi Goreng Spesial', category: 'Makanan', price: 15000, stock: 30 },
+      { name: 'Mie Goreng Kantin', category: 'Makanan', price: 12000, stock: 35 },
+      { name: 'Mie Rebus Telur', category: 'Makanan', price: 13000, stock: 25 },
+      { name: 'Telur Dadar / Ceplok', category: 'Makanan', price: 5000, stock: 50 },
+      { name: 'Ayam Goreng Crispy', category: 'Makanan', price: 14000, stock: 25 },
+      { name: 'Es Teh Manis', category: 'Minuman', price: 4000, stock: 60 },
+      { name: 'Teh Hangat', category: 'Minuman', price: 3000, stock: 40 },
+      { name: 'Kopi Hitam Tubruk', category: 'Minuman', price: 5000, stock: 30 },
+      { name: 'Air Mineral Gelas', category: 'Minuman', price: 1000, stock: 100 },
+      { name: 'Kerupuk Kaleng', category: 'Cemilan', price: 1000, stock: 150 },
+      { name: 'Gorengan (Bakwan/Tahu)', category: 'Cemilan', price: 2000, stock: 80 },
+      { name: 'Sosis Bakar', category: 'Cemilan', price: 7000, stock: 20 },
+      { name: 'Nugget Goreng (5 pcs)', category: 'Cemilan', price: 10000, stock: 20 },
+    ],
+  },
+  {
+    id: 'kebutuhan-rumah',
+    name: 'Kebutuhan Rumah',
+    description: 'Household cleaning supplies, detergents, and washing essentials',
+    products: [
+      { name: 'Rinso Anti Noda 800g', category: 'Lainnya', price: 23000, stock: 20 },
+      { name: 'So Klin Liquid 750ml', category: 'Lainnya', price: 17500, stock: 25 },
+      { name: 'Molto Pewangi Pakaian 900ml', category: 'Lainnya', price: 16000, stock: 20 },
+      { name: 'Sunlight Jeruk Nipis 755ml', category: 'Lainnya', price: 18500, stock: 30 },
+      { name: 'Mama Lemon 780ml', category: 'Lainnya', price: 17000, stock: 25 },
+      { name: 'Wipol Pembersih Lantai 780ml', category: 'Lainnya', price: 19000, stock: 15 },
+      { name: 'Bayclin Pemutih 500ml', category: 'Lainnya', price: 10000, stock: 15 },
+      { name: 'Tissue Roll (Pack of 2)', category: 'Lainnya', price: 12000, stock: 35 },
+      { name: 'Plastik Sampah Hitam Besar', category: 'Lainnya', price: 11000, stock: 20 },
+      { name: 'Spons Cuci Piring (Pack 3)', category: 'Lainnya', price: 7500, stock: 40 },
+    ],
+  },
+];
+
 export default function InventoryPage() {
   const [products, setProducts] = useState([]);
+  const [customPresets, setCustomPresets] = useState([]);
+
+  // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showPresetModal, setShowPresetModal] = useState(false);
+  const [showSavePresetModal, setShowSavePresetModal] = useState(false);
+  const [showLoadConfirmModal, setShowLoadConfirmModal] = useState(false);
+
+  // Selected preset to load
+  const [selectedPresetToLoad, setSelectedPresetToLoad] = useState(null);
+  const [loadMode, setLoadMode] = useState('add'); // 'add' or 'replace'
+
+  // Custom preset form state
+  const [savePresetForm, setSavePresetForm] = useState({ name: '', description: '' });
+
   const [form, setForm] = useState({ name: '', category: 'Makanan', price: '', stock: '' });
   const [editForm, setEditForm] = useState({ id: null, name: '', category: 'Makanan', price: '', stock: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
 
-  // Custom confirmation modal state
+  // Custom confirmation modal state (for delete / reset)
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     title: '',
     message: '',
-    actionType: null, // 'delete' or 'reset'
+    actionType: null, // 'delete' | 'reset' | 'delete_custom_preset'
     targetId: null,
   });
 
@@ -25,11 +126,50 @@ export default function InventoryPage() {
   const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
-    const saved = localStorage.getItem('zenith_products') || localStorage.getItem('umkm_products');
-    if (saved) {
-      setProducts(JSON.parse(saved));
+    // Load products and normalize/deduplicate IDs if any duplicates or missing IDs exist
+    const savedProducts = localStorage.getItem('zenith_products') || localStorage.getItem('umkm_products');
+    if (savedProducts) {
+      try {
+        const parsed = JSON.parse(savedProducts);
+        if (Array.isArray(parsed)) {
+          const seenIds = new Set();
+          const normalized = parsed.map((p, index) => {
+            let uniqueId = p.id;
+            if (uniqueId === undefined || uniqueId === null || seenIds.has(uniqueId)) {
+              do {
+                uniqueId = Date.now() + index + Math.floor(Math.random() * 100000);
+              } while (seenIds.has(uniqueId));
+            }
+            seenIds.add(uniqueId);
+            return {
+              ...p,
+              id: uniqueId,
+            };
+          });
+          setProducts(normalized);
+          // Save back the normalized unique IDs to storage
+          localStorage.setItem('zenith_products', JSON.stringify(normalized));
+          localStorage.setItem('umkm_products', JSON.stringify(normalized));
+        } else {
+          setProducts([]);
+        }
+      } catch (e) {
+        setProducts([]);
+      }
     } else {
       setProducts([]);
+    }
+
+    // Load custom presets
+    const savedPresets = localStorage.getItem('zenith_presets');
+    if (savedPresets) {
+      try {
+        setCustomPresets(JSON.parse(savedPresets));
+      } catch (e) {
+        setCustomPresets([]);
+      }
+    } else {
+      setCustomPresets([]);
     }
   }, []);
 
@@ -72,6 +212,17 @@ export default function InventoryPage() {
     return cleanValue ? Number(cleanValue) : '';
   };
 
+  const saveProductsToStorage = (updatedProducts) => {
+    setProducts(updatedProducts);
+    localStorage.setItem('zenith_products', JSON.stringify(updatedProducts));
+    localStorage.setItem('umkm_products', JSON.stringify(updatedProducts));
+  };
+
+  const saveCustomPresetsToStorage = (updatedPresets) => {
+    setCustomPresets(updatedPresets);
+    localStorage.setItem('zenith_presets', JSON.stringify(updatedPresets));
+  };
+
   const handleAddProduct = (e) => {
     e.preventDefault();
     const rawPrice = parseNumberInput(form.price);
@@ -82,17 +233,14 @@ export default function InventoryPage() {
 
     const newProduct = {
       id: Date.now(),
-      name: form.name,
+      name: form.name.trim(),
       category: form.category,
       price: Number(rawPrice),
       stock: Number(form.stock),
     };
 
     const updated = [newProduct, ...products];
-    setProducts(updated);
-    localStorage.setItem('zenith_products', JSON.stringify(updated));
-    localStorage.setItem('umkm_products', JSON.stringify(updated));
-
+    saveProductsToStorage(updated);
     setForm({ name: '', category: 'Makanan', price: '', stock: '' });
     setShowAddModal(false);
     showToast('Produk berhasil ditambahkan!');
@@ -121,7 +269,7 @@ export default function InventoryPage() {
       if (p.id === editForm.id) {
         return {
           ...p,
-          name: editForm.name,
+          name: editForm.name.trim(),
           category: editForm.category,
           price: Number(rawPrice),
           stock: Number(editForm.stock),
@@ -130,9 +278,7 @@ export default function InventoryPage() {
       return p;
     });
 
-    setProducts(updated);
-    localStorage.setItem('zenith_products', JSON.stringify(updated));
-    localStorage.setItem('umkm_products', JSON.stringify(updated));
+    saveProductsToStorage(updated);
     setShowEditModal(false);
     showToast('Produk berhasil diperbarui!');
   };
@@ -157,12 +303,20 @@ export default function InventoryPage() {
     });
   };
 
+  const promptDeleteCustomPreset = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Custom Preset',
+      message: 'Apakah Anda yakin ingin menghapus preset custom ini?',
+      actionType: 'delete_custom_preset',
+      targetId: id,
+    });
+  };
+
   const handleConfirmAction = () => {
     if (confirmModal.actionType === 'delete') {
       const updated = products.filter((p) => p.id !== confirmModal.targetId);
-      setProducts(updated);
-      localStorage.setItem('zenith_products', JSON.stringify(updated));
-      localStorage.setItem('umkm_products', JSON.stringify(updated));
+      saveProductsToStorage(updated);
       showToast('Produk berhasil dihapus.');
     } else if (confirmModal.actionType === 'reset') {
       localStorage.removeItem('zenith_products');
@@ -171,6 +325,10 @@ export default function InventoryPage() {
       localStorage.removeItem('umkm_transactions');
       setProducts([]);
       showToast('Seluruh data berhasil direset.');
+    } else if (confirmModal.actionType === 'delete_custom_preset') {
+      const updatedPresets = customPresets.filter((cp) => cp.id !== confirmModal.targetId);
+      saveCustomPresetsToStorage(updatedPresets);
+      showToast('Custom preset berhasil dihapus.');
     }
     setConfirmModal({ isOpen: false, title: '', message: '', actionType: null, targetId: null });
   };
@@ -183,9 +341,77 @@ export default function InventoryPage() {
       }
       return p;
     });
-    setProducts(updated);
-    localStorage.setItem('zenith_products', JSON.stringify(updated));
-    localStorage.setItem('umkm_products', JSON.stringify(updated));
+    saveProductsToStorage(updated);
+  };
+
+  // Preset loading trigger
+  const handleInitiateLoadPreset = (preset) => {
+    setSelectedPresetToLoad(preset);
+    setLoadMode('add'); // default safe mode
+    setShowPresetModal(false);
+    setShowLoadConfirmModal(true);
+  };
+
+  // Execute loading preset with Add or Replace mode
+  const handleExecuteLoadPreset = () => {
+    if (!selectedPresetToLoad || !selectedPresetToLoad.products) return;
+
+    // Create deep copy with fresh IDs
+    const preparedProducts = selectedPresetToLoad.products.map((p, idx) => ({
+      id: Date.now() + idx + Math.floor(Math.random() * 1000),
+      name: p.name,
+      category: p.category || 'Lainnya',
+      price: Number(p.price),
+      stock: Number(p.stock),
+    }));
+
+    let finalProducts = [];
+    if (loadMode === 'replace') {
+      finalProducts = preparedProducts;
+    } else {
+      // Add mode: avoid exact name duplicates (case-insensitive)
+      const existingNames = new Set(products.map((p) => p.name.toLowerCase().trim()));
+      const uniqueNewProducts = preparedProducts.filter(
+        (p) => !existingNames.has(p.name.toLowerCase().trim())
+      );
+      finalProducts = [...uniqueNewProducts, ...products];
+    }
+
+    saveProductsToStorage(finalProducts);
+    setShowLoadConfirmModal(false);
+    showToast(`✓ ${selectedPresetToLoad.name} berhasil dimuat — ${preparedProducts.length} produk.`);
+    setSelectedPresetToLoad(null);
+  };
+
+  // Save current inventory as a custom preset
+  const handleSaveCustomPreset = (e) => {
+    e.preventDefault();
+    if (!savePresetForm.name.trim()) {
+      showToast('Nama preset wajib diisi!');
+      return;
+    }
+    if (products.length === 0) {
+      showToast('Inventaris Anda kosong. Tambahkan beberapa produk terlebih dahulu.');
+      return;
+    }
+
+    const newCustomPreset = {
+      id: 'custom-' + Date.now(),
+      name: savePresetForm.name.trim(),
+      description: savePresetForm.description.trim() || 'Custom user preset',
+      products: products.map((p) => ({
+        name: p.name,
+        category: p.category,
+        price: p.price,
+        stock: p.stock,
+      })),
+    };
+
+    const updatedPresets = [newCustomPreset, ...customPresets];
+    saveCustomPresetsToStorage(updatedPresets);
+    setSavePresetForm({ name: '', description: '' });
+    setShowSavePresetModal(false);
+    showToast(`Preset "${newCustomPreset.name}" berhasil disimpan!`);
   };
 
   // Stock status badge helper
@@ -238,7 +464,16 @@ export default function InventoryPage() {
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Manajemen Stok & Produk</h2>
           <p className="text-slate-500 text-sm font-normal">Kelola inventaris barang, penyesuaian harga, dan ketersediaan stok.</p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => setShowPresetModal(true)}
+            className="bg-sky-600 hover:bg-sky-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-sky-600/20 transition flex items-center space-x-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            <span>📦 Preset Data</span>
+          </button>
           <button
             onClick={promptReset}
             className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-4 py-2.5 rounded-xl text-xs transition"
@@ -309,7 +544,7 @@ export default function InventoryPage() {
               {filteredProducts.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="py-16 text-center text-slate-400 text-sm font-medium">
-                    Tidak ada produk ditemukan. Silakan tambahkan produk baru.
+                    Tidak ada produk ditemukan. Silakan tambahkan produk baru atau gunakan <button onClick={() => setShowPresetModal(true)} className="text-sky-600 underline font-semibold">Preset Data</button>.
                   </td>
                 </tr>
               ) : (
@@ -364,6 +599,227 @@ export default function InventoryPage() {
           </table>
         </div>
       </div>
+
+      {/* Modal: Preset Data Explorer */}
+      {showPresetModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 md:p-8 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6 pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-lg">
+                  📦
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Preset Data & Starter Inventory</h3>
+                  <p className="text-xs text-slate-500">Pilih dari preset retail Indonesia atau buat preset kustom Anda.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowPresetModal(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Built-in Presets Section */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Built-in Retail Presets</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {BUILT_IN_PRESETS.map((preset) => (
+                    <div key={preset.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:border-sky-300 transition flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-start mb-1">
+                          <h5 className="font-bold text-slate-800 text-sm">{preset.name}</h5>
+                          <span className="px-2 py-0.5 bg-sky-100 text-sky-700 rounded text-[10px] font-semibold">
+                            {preset.products.length} produk
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mb-4 leading-relaxed">{preset.description}</p>
+                      </div>
+                      <button
+                        onClick={() => handleInitiateLoadPreset(preset)}
+                        className="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold shadow-xs transition"
+                      >
+                        Muat Preset &rarr;
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Presets Section */}
+              <div className="pt-4 border-t border-slate-200">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">My Custom Presets</h4>
+                  <button
+                    onClick={() => {
+                      setShowPresetModal(false);
+                      setShowSavePresetModal(true);
+                    }}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition"
+                  >
+                    + Simpan Inventaris Saat Ini sebagai Preset
+                  </button>
+                </div>
+
+                {customPresets.length === 0 ? (
+                  <div className="p-6 text-center border border-dashed border-slate-200 rounded-xl text-slate-400 text-xs">
+                    Belum ada custom preset yang disimpan.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {customPresets.map((preset) => (
+                      <div key={preset.id} className="p-4 rounded-xl border border-slate-200 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h5 className="font-bold text-slate-800 text-sm">{preset.name}</h5>
+                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-semibold">
+                              {preset.products.length} produk
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500">{preset.description}</p>
+                        </div>
+                        <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                          <button
+                            onClick={() => handleInitiateLoadPreset(preset)}
+                            className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold transition"
+                          >
+                            Muat
+                          </button>
+                          <button
+                            onClick={() => promptDeleteCustomPreset(preset.id)}
+                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold transition"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-8 pt-4 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setShowPresetModal(false)}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Load Preset Confirmation (Add vs Replace) */}
+      {showLoadConfirmModal && selectedPresetToLoad && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 md:p-8 shadow-2xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Muat Preset: {selectedPresetToLoad.name}</h3>
+            <p className="text-xs text-slate-500 mb-6">Bagaimana Anda ingin menambahkan produk preset ini ke inventaris?</p>
+
+            <div className="space-y-3 mb-6">
+              <label className={`flex items-start p-3.5 rounded-xl border cursor-pointer transition ${loadMode === 'add' ? 'border-sky-600 bg-sky-50/50' : 'border-slate-200 bg-white'}`}>
+                <input
+                  type="radio"
+                  name="loadMode"
+                  value="add"
+                  checked={loadMode === 'add'}
+                  onChange={() => setLoadMode('add')}
+                  className="mt-0.5 text-sky-600 focus:ring-sky-500"
+                />
+                <div className="ml-3">
+                  <span className="block text-xs font-bold text-slate-900">Tambahkan ke inventaris saat ini (Aman)</span>
+                  <span className="block text-[11px] text-slate-500 mt-0.5">Mempertahankan produk lama dan menambahkan produk baru dari preset (duplikat nama dicegah).</span>
+                </div>
+              </label>
+
+              <label className={`flex items-start p-3.5 rounded-xl border cursor-pointer transition ${loadMode === 'replace' ? 'border-rose-600 bg-rose-50/50' : 'border-slate-200 bg-white'}`}>
+                <input
+                  type="radio"
+                  name="loadMode"
+                  value="replace"
+                  checked={loadMode === 'replace'}
+                  onChange={() => setLoadMode('replace')}
+                  className="mt-0.5 text-rose-600 focus:ring-rose-500"
+                />
+                <div className="ml-3">
+                  <span className="block text-xs font-bold text-slate-900">Ganti seluruh inventaris</span>
+                  <span className="block text-[11px] text-slate-500 mt-0.5">Menghapus seluruh produk lama dan menggantinya dengan isi preset ini.</span>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLoadConfirmModal(false);
+                  setSelectedPresetToLoad(null);
+                }}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteLoadPreset}
+                className="flex-1 py-2.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl shadow-md shadow-sky-600/30 transition"
+              >
+                Muat Preset Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Save Current Inventory as Custom Preset */}
+      {showSavePresetModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 md:p-8 shadow-2xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Simpan Custom Preset</h3>
+            <p className="text-xs text-slate-500 mb-6">Simpan {products.length} produk di inventaris saat ini sebagai preset kustom.</p>
+
+            <form onSubmit={handleSaveCustomPreset} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama Preset</label>
+                <input
+                  type="text"
+                  required
+                  value={savePresetForm.name}
+                  onChange={(e) => setSavePresetForm({ ...savePresetForm, name: e.target.value })}
+                  placeholder="Contoh: Toko Cabang Utama"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Deskripsi (Opsional)</label>
+                <textarea
+                  value={savePresetForm.description}
+                  onChange={(e) => setSavePresetForm({ ...savePresetForm, description: e.target.value })}
+                  placeholder="Contoh: Stok standar untuk cabang utama"
+                  rows="3"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 resize-none"
+                ></textarea>
+              </div>
+
+              <div className="pt-4 flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSavePresetModal(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/30 transition"
+                >
+                  Simpan Preset
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal Tambah Produk */}
       {showAddModal && (

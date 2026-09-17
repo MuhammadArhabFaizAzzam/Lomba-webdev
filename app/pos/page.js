@@ -129,6 +129,7 @@ export default function POSPage() {
     setShowReceiptModal(true);
     setSuccessMessage(`Transaksi ${trxId} Berhasil Disimpan!`);
     setCart([]);
+    setPaymentMethod('QRIS');
 
     setTimeout(() => {
       setSuccessMessage('');
@@ -224,7 +225,7 @@ export default function POSPage() {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
           {products.length === 0 ? (
             <div className="col-span-full py-16 bg-white rounded-2xl border border-slate-200 text-center text-slate-400 text-sm font-medium p-8">
               <p className="mb-3">Belum ada produk terdaftar di sistem POS.</p>
