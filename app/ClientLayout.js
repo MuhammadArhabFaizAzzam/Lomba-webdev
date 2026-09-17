@@ -93,17 +93,42 @@ export default function ClientLayout({ children }) {
     syncAuth();
   }, [pathname]);
 
-  // Route Guards & Authentication Checks using direct localStorage inspection
+  // Route Guards & Guest / Authenticated Redirection Rules
   useEffect(() => {
+    if (!isInitialized) return;
+
     const freshUser = syncAuth();
     const protectedPaths = ['/pos', '/transactions', '/inventory', '/guide'];
+    const guestOnlyPaths = ['/welcome', '/login'];
 
+    // 1. Root path '/' behavior:
+    // If guest -> redirect to /welcome
+    // If authenticated -> allow '/' (both management and kasir can view dashboard)
+    if (pathname === '/') {
+      if (!freshUser) {
+        router.push('/welcome');
+        return;
+      }
+    }
+
+    // 2. Unauthenticated user trying to access protected routes -> redirect to /login
     if (!freshUser && protectedPaths.includes(pathname)) {
       showToast('Akses Ditolak! Silakan login terlebih dahulu untuk mengakses halaman ini.');
       router.push('/login');
       return;
     }
 
+    // 3. Authenticated user trying to access guest-only paths (/welcome, /login) -> redirect to role destination
+    if (freshUser && guestOnlyPaths.includes(pathname)) {
+      if (freshUser.role === 'kasir') {
+        router.push('/pos');
+      } else {
+        router.push('/');
+      }
+      return;
+    }
+
+    // 4. Kasir permission enforcement on inventory / guide
     if (freshUser && freshUser.role === 'kasir') {
       const kasirAllowed = ['/', '/welcome', '/pos', '/transactions'];
       if (!kasirAllowed.includes(pathname)) {
@@ -111,19 +136,20 @@ export default function ClientLayout({ children }) {
         router.push('/pos');
       }
     }
-  }, [pathname, router]);
+  }, [pathname, router, isInitialized]);
 
   const handleLogout = () => {
     localStorage.removeItem('zenith_auth_user');
     setUser(null);
     window.dispatchEvent(new Event('zenith_auth_update'));
     showToast('Berhasil keluar dari sesi.');
-    router.push('/');
+    router.push('/welcome');
   };
 
   // Define navigation items based on user auth status and role
   const allNavigation = [
     {
+<<<<<<< HEAD
       name: 'Beranda / Selamat Datang',
       href: '/welcome',
       roles: ['guest', 'kasir', 'management'],
@@ -134,6 +160,16 @@ export default function ClientLayout({ children }) {
       href: '/',
       roles: ['guest', 'kasir', 'management'],
       icon: DashboardIcon,
+=======
+      name: 'Dashboard Bisnis',
+      href: '/',
+      roles: ['kasir', 'management'],
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ),
+>>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
     },
     {
       name: 'Kasir (POS)',
@@ -161,9 +197,26 @@ export default function ClientLayout({ children }) {
     },
   ];
 
-  const currentRoleKey = user ? user.role : 'guest';
-  const navigation = allNavigation.filter(item => item.roles.includes(currentRoleKey));
+  const currentRoleKey = user ? user.role : null;
+  const navigation = user ? allNavigation.filter(item => item.roles.includes(currentRoleKey)) : [];
 
+  // If user is not authenticated and viewing guest pages (/welcome or /login), render with light Zenith POS theme without sidebar
+  if (!user && (pathname === '/welcome' || pathname === '/login')) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans relative">
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce flex items-center space-x-2">
+            <span>🔔</span>
+            <span>{toastMessage}</span>
+          </div>
+        )}
+        {children}
+      </div>
+    );
+  }
+
+  // Authenticated Layout Shell
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col md:flex-row font-sans relative">
       {/* Toast Notification */}
@@ -188,8 +241,8 @@ export default function ClientLayout({ children }) {
           </div>
         </div>
 
-        {/* User Badge or Login CTA */}
-        {user ? (
+        {/* User Badge & Logout */}
+        {user && (
           <div className="mx-4 mt-4 p-3 bg-slate-800/80 rounded-xl border border-slate-700/60 flex items-center justify-between">
             <div className="truncate">
               <p className="text-xs font-bold text-white truncate">{user.username}</p>
@@ -204,16 +257,6 @@ export default function ClientLayout({ children }) {
             >
               Keluar
             </button>
-          </div>
-        ) : (
-          <div className="mx-4 mt-4 p-3 bg-indigo-950/60 rounded-xl border border-indigo-800/60 text-center">
-            <p className="text-xs text-indigo-200 mb-2 font-medium">Belum masuk sistem</p>
-            <Link
-              href="/login"
-              className="block w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/30 transition text-center"
-            >
-              Login Sekarang &rarr;
-            </Link>
           </div>
         )}
 
@@ -246,24 +289,17 @@ export default function ClientLayout({ children }) {
           </div>
           <div>
             <span className="font-bold text-base tracking-tight block">Zenith POS</span>
-            <span className="text-[10px] text-indigo-400 uppercase">{user ? user.role : 'Public Visitor'}</span>
+            <span className="text-[10px] text-indigo-400 uppercase">{user ? user.role : ''}</span>
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          {user ? (
+          {user && (
             <button
               onClick={handleLogout}
               className="px-2.5 py-1.5 bg-rose-900/60 hover:bg-rose-800 text-rose-200 rounded-lg text-xs font-semibold"
             >
               Keluar
             </button>
-          ) : (
-            <Link
-              href="/login"
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold"
-            >
-              Login
-            </Link>
           )}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -301,18 +337,14 @@ export default function ClientLayout({ children }) {
       <main className="flex-1 flex flex-col min-h-screen overflow-y-auto">
         <header className="bg-white border-b border-slate-200 px-8 py-4 hidden md:flex items-center justify-between shadow-xs z-0">
           <div className="text-sm font-medium text-slate-600 flex items-center space-x-2">
-            <span>Status Akses:</span>
-            {user ? (
+            <span>Login sebagai:</span>
+            {user && (
               <>
                 <span className="font-bold text-slate-900">{user.username}</span>
                 <span className="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-50 text-indigo-700 uppercase">
                   {user.role}
                 </span>
               </>
-            ) : (
-              <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-600 uppercase">
-                Public Visitor (Belum Login)
-              </span>
             )}
           </div>
           <div className="flex items-center space-x-4">
@@ -320,25 +352,20 @@ export default function ClientLayout({ children }) {
               <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
               Sistem Aktif & Terhubung
             </span>
-            {user ? (
+            {user && (
               <button
                 onClick={handleLogout}
                 className="text-xs font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg transition"
               >
                 Keluar (Logout)
               </button>
-            ) : (
-              <Link
-                href="/login"
-                className="text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded-lg shadow-sm transition"
-              >
-                Login Sistem &rarr;
-              </Link>
             )}
           </div>
         </header>
 
-        <div className="page-shell">{children}</div>
+        <div className="flex-1 p-6 md:p-10 lg:p-12 max-w-7xl 2xl:max-w-[1700px] w-full mx-auto">
+          {children}
+        </div>
       </main>
     </div>
   );

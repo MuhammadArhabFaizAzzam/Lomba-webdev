@@ -133,12 +133,168 @@ export default function Dashboard() {
         </div>
       </div>
 
+<<<<<<< HEAD
       <div className="metric-grid">
         {metrics.map(({ label, value, trend, icon: Icon, tone }) => (
           <div key={label} className={`metric-card ${tone}`}>
             <div className="card-header">
               <span className="metric-label">{label}</span>
               <span className="metric-icon"><Icon size={18} /></span>
+=======
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Pendapatan</p>
+            <h3 className="text-2xl font-extrabold text-slate-800 mt-1">{formatRupiah(stats.totalRevenue)}</h3>
+            <span className="text-xs text-emerald-600 font-semibold mt-1 inline-flex items-center">
+              <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+              Sistem Aktif
+            </span>
+          </div>
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Transaksi</p>
+            <h3 className="text-2xl font-extrabold text-slate-800 mt-1">{stats.totalTransactions}</h3>
+            <span className="text-xs text-indigo-600 font-semibold mt-1 inline-block">Transaksi tercatat</span>
+          </div>
+          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Jenis Produk</p>
+            <h3 className="text-2xl font-extrabold text-slate-800 mt-1">{stats.totalProducts}</h3>
+            <span className="text-xs text-slate-500 font-semibold mt-1 inline-block">Item aktif etalase</span>
+          </div>
+          <div className="w-12 h-12 bg-sky-50 text-sky-600 rounded-2xl flex items-center justify-center">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Peringatan Stok</p>
+            <h3 className={`text-2xl font-extrabold mt-1 ${stats.lowStockCount > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
+              {stats.lowStockCount}
+            </h3>
+            <span className="text-xs text-amber-600 font-semibold mt-1 inline-block">Perlu restock segera</span>
+          </div>
+          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Sales Trend Analytics Chart */}
+      <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-base font-bold text-slate-800">Grafik Tren Penjualan Mingguan</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Analisis omset penjualan per hari dalam 7 hari terakhir</p>
+          </div>
+          <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-lg">
+            Real-time Analytics
+          </span>
+        </div>
+        <div className="h-48 lg:h-56 flex items-end justify-between gap-2 pt-6 px-2 border-b border-slate-100">
+          {salesChartData.map((item, index) => {
+            const heightPercent = maxChartAmount > 0 ? Math.round((item.amount / maxChartAmount) * 100) : 0;
+            return (
+              <div key={index} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end">
+                <div className="text-[10px] font-bold text-indigo-600 opacity-0 group-hover:opacity-100 transition">
+                  {formatRupiah(item.amount)}
+                </div>
+                <div
+                  style={{ height: `${Math.max(heightPercent, 6)}%` }}
+                  className="w-full max-w-[40px] bg-indigo-500 group-hover:bg-indigo-600 rounded-t-xl transition-all duration-300 shadow-xs"
+                ></div>
+                <span className="text-xs font-semibold text-slate-500 pt-1">{item.day}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Grid for Alerts & Recent Transactions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Recent Transactions */}
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-xs border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-base font-bold text-slate-800">Transaksi Penjualan Terbaru</h3>
+            <Link href="/pos" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center">
+              <span>Buka Kasir POS</span>
+              <svg className="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            {recentTransactions.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-sm font-medium">
+                Belum ada transaksi penjualan.<br />
+                <Link href="/pos" className="text-indigo-600 hover:underline mt-1 inline-block text-xs font-semibold">
+                  Mulai transaksi di Kasir POS &rarr;
+                </Link>
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 text-xs text-slate-400 uppercase tracking-wider">
+                    <th className="pb-3 font-semibold">ID TRX</th>
+                    <th className="pb-3 font-semibold">Waktu</th>
+                    <th className="pb-3 font-semibold">Detail Item</th>
+                    <th className="pb-3 font-semibold">Metode</th>
+                    <th className="pb-3 font-semibold text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {recentTransactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 font-semibold text-indigo-600">{tx.id}</td>
+                      <td className="py-3 text-slate-500 text-xs font-medium">{tx.date}</td>
+                      <td className="py-3 text-slate-700 font-medium">{tx.items}</td>
+                      <td className="py-3">
+                        <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-700">
+                          {tx.payment}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right font-bold text-slate-800">{formatRupiah(tx.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* Low Stock Warning Box */}
+        <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-slate-800 flex items-center">
+                <svg className="w-4 h-4 text-amber-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Stok Menipis
+              </h3>
+              <Link href="/inventory" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+                Kelola Stok &rarr;
+              </Link>
+>>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
             </div>
 
             <p className="metric-value">{value}</p>
