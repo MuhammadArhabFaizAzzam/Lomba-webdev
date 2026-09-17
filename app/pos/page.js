@@ -1,305 +1,269 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { Minus, Plus, Search, Trash2 } from 'lucide-react';
+import { formatRupiah } from '../utils/formatCurrency';
+
+const categories = ['Semua', 'Makanan', 'Minuman', 'Cemilan', 'Lainnya'];
 
 export default function POSPage() {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('QRIS');
-  const [successMessage, setSuccessMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
-  
-  // Receipt modal state
-  const [receiptData, setReceiptData] = useState(null);
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [themeMode, setThemeMode] = useState('dark');
 
   useEffect(() => {
-    const saved = localStorage.getItem('zenith_products') || localStorage.getItem('umkm_products');
-    if (saved) {
-      setProducts(JSON.parse(saved));
-    } else {
-      setProducts([]);
-    }
+    const savedProducts = localStorage.getItem('zenith_products') || localStorage.getItem('umkm_products');
+    const parsedProducts = savedProducts ? JSON.parse(savedProducts) : [];
+    const loadProducts = window.setTimeout(() => setProducts(parsedProducts), 0);
+
+    const savedTheme = localStorage.getItem('zenith_pos_theme');
+    const loadTheme = savedTheme
+      ? window.setTimeout(() => setThemeMode(savedTheme), 0)
+      : undefined;
+
+    return () => {
+      window.clearTimeout(loadProducts);
+      if (loadTheme) window.clearTimeout(loadTheme);
+    };
   }, []);
 
-  const formatRupiah = (number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number);
-  };
+  useEffect(() => {
+    document.body.setAttribute('data-theme', themeMode === 'light' ? 'pos-light' : 'dark');
+    localStorage.setItem('zenith_pos_theme', themeMode);
+  }, [themeMode]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === 'Semua' || product.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, searchQuery, selectedCategory]);
+
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const tax = subtotal * 0.11;
+  const grandTotal = subtotal + tax;
 
   const addToCart = (product) => {
-    if (product.stock <= 0) {
-      alert('Stok produk habis!');
-      return;
-    }
-
+    if (product.stock <= 0) return;
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.id === product.id);
       if (existing) {
-        if (existing.qty >= product.stock) {
-          alert('Jumlah melebihi stok tersedia di gudang!');
-          return prevCart;
-        }
-        return prevCart.map((item) =>
-          item.id === product.id ? { ...item, qty: item.qty + 1 } : item
-        );
-      } else {
-        return [...prevCart, { ...product, qty: 1 }];
+        if (existing.qty >= product.stock) return prevCart;
+        return prevCart.map((item) => item.id === product.id ? { ...item, qty: item.qty + 1 } : item);
       }
+      return [...prevCart, { ...product, qty: 1 }];
     });
   };
 
-  const removeFromCart = (id) => {
-    setCart((prevCart) => prevCart.filter((item) => item.id !== id));
+  const updateQty = (productId, delta) => {
+    setCart((prevCart) =>
+      prevCart
+        .map((item) => {
+          if (item.id !== productId) return item;
+          const nextQty = item.qty + delta;
+          if (nextQty <= 0) return null;
+          return { ...item, qty: nextQty };
+        })
+        .filter(Boolean)
+    );
   };
 
-  const updateQty = (id, delta) => {
-    setCart((prevCart) => {
-      return prevCart.map((item) => {
-        if (item.id === id) {
-          const product = products.find((p) => p.id === id);
-          const newQty = item.qty + delta;
-          if (newQty <= 0) return null;
-          if (newQty > product.stock) {
-            alert('Melebihi stok gudang!');
-            return item;
-          }
-          return { ...item, qty: newQty };
-        }
-        return item;
-      }).filter(Boolean);
-    });
-  };
-
-  const calculateTotal = () => {
-    return cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const removeItem = (productId) => {
+    setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
   };
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
 
-    const total = calculateTotal();
-    const trxId = 'TRX-' + Math.floor(1000 + Math.random() * 9000);
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5);
+    const trxId = `TRX-${now.getTime().toString().slice(-6)}`;
+    const transaction = {
+      id: trxId,
+      date: now.toISOString().slice(0, 10),
+      items: cart.map((item) => `${item.name} (${item.qty})`).join(', '),
+      total: grandTotal,
+      payment: paymentMethod,
+    };
 
-    const itemsSummary = cart.map((i) => `${i.name} (${i.qty})`).join(', ');
+    const saved = localStorage.getItem('zenith_transactions') || localStorage.getItem('umkm_transactions');
+    const currentTransactions = saved ? JSON.parse(saved) : [];
+    const nextTransactions = [transaction, ...currentTransactions];
+    localStorage.setItem('zenith_transactions', JSON.stringify(nextTransactions));
+    localStorage.setItem('umkm_transactions', JSON.stringify(nextTransactions));
 
-    const updatedProducts = products.map((p) => {
-      const cartItem = cart.find((ci) => ci.id === p.id);
-      if (cartItem) {
-        return { ...p, stock: p.stock - cartItem.qty };
-      }
-      return p;
+    const updatedProducts = products.map((product) => {
+      const cartItem = cart.find((item) => item.id === product.id);
+      if (!cartItem) return product;
+      return { ...product, stock: Math.max(0, Number(product.stock || 0) - cartItem.qty) };
     });
 
     setProducts(updatedProducts);
     localStorage.setItem('zenith_products', JSON.stringify(updatedProducts));
     localStorage.setItem('umkm_products', JSON.stringify(updatedProducts));
-
-    const savedTrx = localStorage.getItem('zenith_transactions') || localStorage.getItem('umkm_transactions');
-    const transactions = savedTrx ? JSON.parse(savedTrx) : [];
-    
-    const transactionRecord = {
-      id: trxId,
-      date: dateStr,
-      items: itemsSummary,
-      cartItems: [...cart],
-      total: total,
-      payment: paymentMethod,
-    };
-
-    const newTransactions = [transactionRecord, ...transactions];
-    localStorage.setItem('zenith_transactions', JSON.stringify(newTransactions));
-    localStorage.setItem('umkm_transactions', JSON.stringify(newTransactions));
-
-    // Set receipt data and open receipt modal
-    setReceiptData(transactionRecord);
-    setShowReceiptModal(true);
-    setSuccessMessage(`Transaksi ${trxId} Berhasil Disimpan!`);
     setCart([]);
-
-    setTimeout(() => {
-      setSuccessMessage('');
-    }, 4000);
   };
 
-  const categories = ['Semua', 'Makanan', 'Minuman', 'Cemilan', 'Lainnya'];
-
-  const filteredProducts = products.filter((p) => {
-    const matchesCategory = selectedCategory === 'Semua' || p.category === selectedCategory;
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const paymentMethods = ['QRIS', 'Cash', 'Transfer', 'E-Wallet'];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fadeIn">
-      {/* Product Catalog */}
-      <div className="lg:col-span-2 space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="pos-shell">
+      <div className="pos-area">
+        <div className="pos-toolbar">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Kasir Point of Sale</h2>
-            <p className="text-slate-500 text-sm font-normal">Pilih produk di bawah untuk memasukkan ke keranjang pesanan.</p>
+            <h2 className="pos-title">Kasir Point of Sale</h2>
+            <p className="pos-subtitle">Pilih produk dan proses checkout dengan cepat.</p>
+          </div>
+
+          <button
+            type="button"
+            className="pill-button"
+            onClick={() => setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+          >
+            {themeMode === 'dark' ? 'Dark mode' : 'Light mode'}
+          </button>
+        </div>
+
+        <div className="filter-row">
+          <div style={{ minWidth: 0, flex: 1, position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
+            <input
+              className="input"
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Cari nama produk..."
+              style={{ paddingLeft: 36 }}
+            />
           </div>
         </div>
 
-        {successMessage && (
-          <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl font-medium text-sm flex items-center space-x-3">
-            <svg className="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>{successMessage}</span>
-          </div>
-        )}
+        <div className="filter-row" style={{ marginBottom: 0 }}>
+          {categories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              className={`category-button ${selectedCategory === category ? 'active' : ''}`}
+              onClick={() => setSelectedCategory(category)}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
 
-        {/* Search & Category Filter */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </span>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nama produk..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 transition"
-            />
+        {products.length === 0 ? (
+          <div className="empty-state" style={{ marginTop: 18 }}>
+            <p>Belum ada produk yang bisa dijual. Tambahkan item lewat halaman inventori.</p>
+            <Link href="/inventory" className="btn-primary" style={{ marginTop: 14 }}>
+              Tambah Produk
+            </Link>
           </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            {categories.map((cat) => (
+        ) : (
+          <div className="product-grid" style={{ marginTop: 18 }}>
+            {filteredProducts.map((product) => (
               <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
-                  selectedCategory === cat
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                }`}
+                key={product.id}
+                type="button"
+                className="tap-card"
+                onClick={() => addToCart(product)}
               >
-                {cat}
+                <div className="product-head">
+                  <div>
+                    <div className="product-meta">{product.category}</div>
+                    <h3 className="product-name">{product.name}</h3>
+                  </div>
+                  <span className="product-stock">{product.stock} stok</span>
+                </div>
+
+                <div>
+                  <div className="product-price">{formatRupiah(product.price)}</div>
+                  <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>Tambah ke keranjang</span>
+                    <span style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--surface-1)', display: 'grid', placeItems: 'center' }}><Plus size={14} /></span>
+                  </div>
+                </div>
               </button>
             ))}
           </div>
+        )}
+      </div>
+
+      <aside className="cart-panel">
+        <div className="cart-header">
+          <div>
+            <h3 className="panel-title">Keranjang</h3>
+            <div className="quick-value">{cart.length} item</div>
+          </div>
+          <button className="pill-button" type="button" onClick={() => setCart([])}>Reset</button>
         </div>
 
-        {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {products.length === 0 ? (
-            <div className="col-span-full py-16 bg-white rounded-2xl border border-slate-200 text-center text-slate-400 text-sm font-medium p-8">
-              <p className="mb-3">Belum ada produk terdaftar di sistem POS.</p>
-              <Link
-                href="/inventory"
-                className="inline-block px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl hover:bg-indigo-500 transition shadow-sm"
-              >
-                + Tambah Produk di Manajemen Stok &rarr;
-              </Link>
-            </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="col-span-full py-12 text-center text-slate-400 text-sm">
-              Tidak ada produk yang cocok dengan pencarian.
-            </div>
+        <div className="cart-items">
+          {cart.length === 0 ? (
+            <div className="empty-state">Keranjang masih kosong.</div>
           ) : (
-            filteredProducts.map((product) => (
-              <div
-                key={product.id}
-                onClick={() => addToCart(product)}
-                className={`bg-white p-5 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                  product.stock === 0
-                    ? 'opacity-60 bg-slate-100 border-slate-200 cursor-not-allowed'
-                    : 'border-slate-200 hover:shadow-lg hover:border-indigo-400 group'
-                }`}
-              >
+            cart.map((item) => (
+              <div key={item.id} className="cart-row">
                 <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-md">
-                      {product.category}
-                    </span>
-                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${product.stock <= 5 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}>
-                      Stok: {product.stock}
-                    </span>
-                  </div>
-                  <h3 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-indigo-600 transition">{product.name}</h3>
+                  <div className="cart-item-name">{item.name}</div>
+                  <div className="quick-value">{formatRupiah(item.price)} / pcs</div>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="font-extrabold text-indigo-600 text-sm">{formatRupiah(product.price)}</span>
-                  <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
-                    +
-                  </span>
+
+                <div className="cart-qty">
+                  <button className="qty-button" type="button" onClick={() => updateQty(item.id, -1)} disabled={item.qty <= 1}>
+                    <Minus size={12} />
+                  </button>
+                  <span>{item.qty}</span>
+                  <button className="qty-button" type="button" onClick={() => updateQty(item.id, 1)}>
+                    <Plus size={12} />
+                  </button>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700 }}>{formatRupiah(item.price * item.qty)}</div>
+                  <button type="button" onClick={() => removeItem(item.id)} style={{ marginTop: 4, color: 'var(--text-tertiary)' }}>
+                    <Trash2 size={12} />
+                  </button>
                 </div>
               </div>
             ))
           )}
         </div>
-      </div>
 
-      {/* Cart / Checkout Panel */}
-      <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 flex flex-col justify-between h-fit sticky top-6">
-        <div>
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
-            <h3 className="text-base font-bold text-slate-800">Keranjang Belanja</h3>
-            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-lg">
-              {cart.reduce((a, c) => a + c.qty, 0)} Item
-            </span>
+        <div className="cart-total">
+          <div className="total-row">
+            <span>Subtotal</span>
+            <span>{formatRupiah(subtotal)}</span>
+          </div>
+          <div className="total-row">
+            <span>Pajak</span>
+            <span>{formatRupiah(tax)}</span>
+          </div>
+          <div className="total-row">
+            <span>Total</span>
+            <strong>{formatRupiah(grandTotal)}</strong>
           </div>
 
-          {cart.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 text-xs font-medium">
-              Keranjang masih kosong.<br />Pilih produk dari katalog di samping.
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-              {cart.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl border border-slate-100">
-                  <div className="flex-1 pr-2">
-                    <h4 className="font-semibold text-slate-800 text-xs truncate">{item.name}</h4>
-                    <span className="text-xs text-indigo-600 font-semibold">{formatRupiah(item.price)}</span>
-                  </div>
-                  <div className="flex items-center space-x-1.5">
-                    <button
-                      onClick={() => updateQty(item.id, -1)}
-                      className="w-6 h-6 rounded-md bg-white border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center hover:bg-slate-100"
-                    >
-                      -
-                    </button>
-                    <span className="text-xs font-bold w-5 text-center">{item.qty}</span>
-                    <button
-                      onClick={() => updateQty(item.id, 1)}
-                      className="w-6 h-6 rounded-md bg-white border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center hover:bg-slate-100"
-                    >
-                      +
-                    </button>
-                    <button
-                      onClick={() => removeFromCart(item.id)}
-                      className="text-rose-500 hover:text-rose-700 text-xs ml-1 p-1 font-bold"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-6 pt-4 border-t border-slate-100 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-              Metode Pembayaran
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {['QRIS', 'Tunai', 'Transfer'].map((method) => (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 8 }}>Metode Pembayaran</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {paymentMethods.map((method) => (
                 <button
                   key={method}
+                  type="button"
+                  className={`payment-button ${paymentMethod === method ? 'active' : ''}`}
                   onClick={() => setPaymentMethod(method)}
-                  className={`py-2 rounded-xl text-xs font-semibold border transition ${
-                    paymentMethod === method
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                  }`}
+                  style={{
+                    background: paymentMethod === method ? 'var(--surface-2)' : 'rgba(255,255,255,0.02)',
+                    color: 'var(--text-primary)',
+                    border: paymentMethod === method ? '1px solid var(--accent-tertiary)' : '1px solid var(--border-default)',
+                    minWidth: 92,
+                    padding: '10px 12px',
+                    fontWeight: 700,
+                  }}
                 >
                   {method}
                 </button>
@@ -307,98 +271,11 @@ export default function POSPage() {
             </div>
           </div>
 
-          <div className="flex justify-between items-center text-base font-bold text-slate-800 pt-1">
-            <span>Total Pembayaran:</span>
-            <span className="text-indigo-600 text-lg">{formatRupiah(calculateTotal())}</span>
-          </div>
-
-          <button
-            onClick={handleCheckout}
-            disabled={cart.length === 0}
-            className={`w-full py-3 px-4 rounded-xl font-bold text-xs text-white shadow-md transition ${
-              cart.length === 0
-                ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30'
-            }`}
-          >
-            Proses Pembayaran & Cetak Struk
+          <button type="button" className="checkout-button" onClick={handleCheckout} disabled={cart.length === 0}>
+            Proses Pembayaran / Checkout
           </button>
         </div>
-      </div>
-
-      {/* Thermal Receipt Modal */}
-      {showReceiptModal && receiptData && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 flex flex-col">
-            <div className="text-center pb-4 border-b border-dashed border-slate-300">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white font-bold text-lg flex items-center justify-center mx-auto mb-2 shadow-md">
-                Z
-              </div>
-              <h3 className="font-extrabold text-slate-900 text-base">ZENITH POS RECEIPT</h3>
-              <p className="text-[11px] text-slate-500">Professional Retail Solution</p>
-            </div>
-
-            <div className="py-4 space-y-2 text-xs text-slate-600 border-b border-dashed border-slate-300">
-              <div className="flex justify-between">
-                <span>No. Transaksi:</span>
-                <span className="font-bold text-slate-800">{receiptData.id}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Waktu:</span>
-                <span className="font-medium text-slate-800">{receiptData.date}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Metode Bayar:</span>
-                <span className="font-semibold text-indigo-600">{receiptData.payment}</span>
-              </div>
-            </div>
-
-            <div className="py-4 space-y-2 max-h-48 overflow-y-auto border-b border-dashed border-slate-300">
-              {receiptData.cartItems ? (
-                receiptData.cartItems.map((ci, idx) => (
-                  <div key={idx} className="flex justify-between text-xs">
-                    <div className="pr-2">
-                      <p className="font-semibold text-slate-800">{ci.name}</p>
-                      <p className="text-[11px] text-slate-400">{ci.qty} x {formatRupiah(ci.price)}</p>
-                    </div>
-                    <span className="font-bold text-slate-800 self-center">{formatRupiah(ci.qty * ci.price)}</span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-600">{receiptData.items}</p>
-              )}
-            </div>
-
-            <div className="py-4 space-y-1.5 border-b border-dashed border-slate-300">
-              <div className="flex justify-between text-sm font-extrabold text-slate-900">
-                <span>TOTAL:</span>
-                <span className="text-indigo-600">{formatRupiah(receiptData.total)}</span>
-              </div>
-            </div>
-
-            <div className="text-center py-3 text-[11px] text-slate-400">
-              Terima Kasih atas Kunjungan Anda!<br />Barang yang sudah dibeli tidak dapat ditukar.
-            </div>
-
-            <div className="flex space-x-2 pt-2">
-              <button
-                onClick={() => {
-                  window.print();
-                }}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition"
-              >
-                Cetak Struk
-              </button>
-              <button
-                onClick={() => setShowReceiptModal(false)}
-                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 font-semibold text-xs hover:bg-slate-50 transition"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </aside>
     </div>
   );
 }
