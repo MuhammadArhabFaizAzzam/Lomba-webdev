@@ -101,9 +101,6 @@ export default function ClientLayout({ children }) {
     const protectedPaths = ['/pos', '/transactions', '/inventory', '/guide'];
     const guestOnlyPaths = ['/welcome', '/login'];
 
-    // 1. Root path '/' behavior:
-    // If guest -> redirect to /welcome
-    // If authenticated -> allow '/' (both management and kasir can view dashboard)
     if (pathname === '/') {
       if (!freshUser) {
         router.push('/welcome');
@@ -111,14 +108,12 @@ export default function ClientLayout({ children }) {
       }
     }
 
-    // 2. Unauthenticated user trying to access protected routes -> redirect to /login
     if (!freshUser && protectedPaths.includes(pathname)) {
       showToast('Akses Ditolak! Silakan login terlebih dahulu untuk mengakses halaman ini.');
       router.push('/login');
       return;
     }
 
-    // 3. Authenticated user trying to access guest-only paths (/welcome, /login) -> redirect to role destination
     if (freshUser && guestOnlyPaths.includes(pathname)) {
       if (freshUser.role === 'kasir') {
         router.push('/pos');
@@ -128,7 +123,6 @@ export default function ClientLayout({ children }) {
       return;
     }
 
-    // 4. Kasir permission enforcement on inventory / guide
     if (freshUser && freshUser.role === 'kasir') {
       const kasirAllowed = ['/', '/welcome', '/pos', '/transactions'];
       if (!kasirAllowed.includes(pathname)) {
@@ -146,10 +140,8 @@ export default function ClientLayout({ children }) {
     router.push('/welcome');
   };
 
-  // Define navigation items based on user auth status and role
   const allNavigation = [
     {
-<<<<<<< HEAD
       name: 'Beranda / Selamat Datang',
       href: '/welcome',
       roles: ['guest', 'kasir', 'management'],
@@ -158,18 +150,8 @@ export default function ClientLayout({ children }) {
     {
       name: 'Dashboard Bisnis',
       href: '/',
-      roles: ['guest', 'kasir', 'management'],
-      icon: DashboardIcon,
-=======
-      name: 'Dashboard Bisnis',
-      href: '/',
       roles: ['kasir', 'management'],
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
->>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
+      icon: DashboardIcon,
     },
     {
       name: 'Kasir (POS)',
@@ -200,11 +182,9 @@ export default function ClientLayout({ children }) {
   const currentRoleKey = user ? user.role : null;
   const navigation = user ? allNavigation.filter(item => item.roles.includes(currentRoleKey)) : [];
 
-  // If user is not authenticated and viewing guest pages (/welcome or /login), render with light Zenith POS theme without sidebar
   if (!user && (pathname === '/welcome' || pathname === '/login')) {
     return (
       <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans relative">
-        {/* Toast Notification */}
         {toastMessage && (
           <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce flex items-center space-x-2">
             <span>🔔</span>
@@ -216,10 +196,8 @@ export default function ClientLayout({ children }) {
     );
   }
 
-  // Authenticated Layout Shell
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col md:flex-row font-sans relative">
-      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce flex items-center space-x-2">
           <span>🔔</span>
@@ -241,7 +219,6 @@ export default function ClientLayout({ children }) {
           </div>
         </div>
 
-        {/* User Badge & Logout */}
         {user && (
           <div className="mx-4 mt-4 p-3 bg-slate-800/80 rounded-xl border border-slate-700/60 flex items-center justify-between">
             <div className="truncate">

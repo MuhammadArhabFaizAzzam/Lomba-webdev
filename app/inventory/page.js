@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { PackagePlus, Plus, Search, Trash2 } from 'lucide-react';
@@ -115,29 +115,18 @@ export default function InventoryPage() {
   const [editForm, setEditForm] = useState({ id: null, name: '', category: 'Makanan', price: '', stock: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
-<<<<<<< HEAD
-=======
 
   // Custom confirmation modal state (for delete / reset)
->>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     title: '',
     message: '',
-<<<<<<< HEAD
-    actionType: null,
-=======
     actionType: null, // 'delete' | 'reset' | 'delete_custom_preset'
->>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
     targetId: null,
   });
   const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
-<<<<<<< HEAD
-    const saved = localStorage.getItem('zenith_products') || localStorage.getItem('umkm_products');
-    setProducts(saved ? JSON.parse(saved) : []);
-=======
     // Load products and normalize/deduplicate IDs if any duplicates or missing IDs exist
     const savedProducts = localStorage.getItem('zenith_products') || localStorage.getItem('umkm_products');
     if (savedProducts) {
@@ -159,7 +148,6 @@ export default function InventoryPage() {
             };
           });
           setProducts(normalized);
-          // Save back the normalized unique IDs to storage
           localStorage.setItem('zenith_products', JSON.stringify(normalized));
           localStorage.setItem('umkm_products', JSON.stringify(normalized));
         } else {
@@ -183,13 +171,17 @@ export default function InventoryPage() {
     } else {
       setCustomPresets([]);
     }
->>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
   }, []);
 
-  const persistProducts = (nextProducts) => {
-    setProducts(nextProducts);
-    localStorage.setItem('zenith_products', JSON.stringify(nextProducts));
-    localStorage.setItem('umkm_products', JSON.stringify(nextProducts));
+  const saveProductsToStorage = (updatedProducts) => {
+    setProducts(updatedProducts);
+    localStorage.setItem('zenith_products', JSON.stringify(updatedProducts));
+    localStorage.setItem('umkm_products', JSON.stringify(updatedProducts));
+  };
+
+  const saveCustomPresetsToStorage = (updatedPresets) => {
+    setCustomPresets(updatedPresets);
+    localStorage.setItem('zenith_presets', JSON.stringify(updatedPresets));
   };
 
   const showToast = (msg) => {
@@ -219,17 +211,6 @@ export default function InventoryPage() {
     return cleanValue ? Number(cleanValue) : '';
   };
 
-  const saveProductsToStorage = (updatedProducts) => {
-    setProducts(updatedProducts);
-    localStorage.setItem('zenith_products', JSON.stringify(updatedProducts));
-    localStorage.setItem('umkm_products', JSON.stringify(updatedProducts));
-  };
-
-  const saveCustomPresetsToStorage = (updatedPresets) => {
-    setCustomPresets(updatedPresets);
-    localStorage.setItem('zenith_presets', JSON.stringify(updatedPresets));
-  };
-
   const handleAddProduct = (e) => {
     e.preventDefault();
     const rawPrice = parseNumberInput(form.price);
@@ -238,22 +219,16 @@ export default function InventoryPage() {
       return;
     }
 
-    const nextProducts = [{
+    const newProduct = {
       id: Date.now(),
       name: form.name.trim(),
       category: form.category,
       price: Number(rawPrice),
       stock: Number(form.stock),
-<<<<<<< HEAD
-    }, ...products];
-
-    persistProducts(nextProducts);
-=======
     };
 
     const updated = [newProduct, ...products];
     saveProductsToStorage(updated);
->>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
     setForm({ name: '', category: 'Makanan', price: '', stock: '' });
     setShowAddModal(false);
     showToast('Produk berhasil ditambahkan!');
@@ -291,21 +266,20 @@ export default function InventoryPage() {
       return p;
     });
 
-<<<<<<< HEAD
-    persistProducts(updated);
-=======
     saveProductsToStorage(updated);
->>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
     setShowEditModal(false);
     showToast('Produk berhasil diperbarui!');
   };
 
   const updateStock = (id, delta) => {
-    const updated = products.map((product) => {
-      if (product.id !== id) return product;
-      return { ...product, stock: Math.max(0, Number(product.stock || 0) + delta) };
+    const updated = products.map((p) => {
+      if (p.id === id) {
+        const newStock = Math.max(0, p.stock + delta);
+        return { ...p, stock: newStock };
+      }
+      return p;
     });
-    persistProducts(updated);
+    saveProductsToStorage(updated);
   };
 
   const promptDelete = (id) => {
@@ -341,11 +315,7 @@ export default function InventoryPage() {
   const handleConfirmAction = () => {
     if (confirmModal.actionType === 'delete') {
       const updated = products.filter((p) => p.id !== confirmModal.targetId);
-<<<<<<< HEAD
-      persistProducts(updated);
-=======
       saveProductsToStorage(updated);
->>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
       showToast('Produk berhasil dihapus.');
     } else if (confirmModal.actionType === 'reset') {
       localStorage.removeItem('zenith_products');
@@ -362,28 +332,16 @@ export default function InventoryPage() {
     setConfirmModal({ isOpen: false, title: '', message: '', actionType: null, targetId: null });
   };
 
-<<<<<<< HEAD
   const filteredProducts = useMemo(() => products.filter((product) => {
     const matchesCategory = selectedCategory === 'Semua' || product.category === selectedCategory;
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   }), [products, searchQuery, selectedCategory]);
-=======
-  const updateStock = (id, delta) => {
-    const updated = products.map((p) => {
-      if (p.id === id) {
-        const newStock = Math.max(0, p.stock + delta);
-        return { ...p, stock: newStock };
-      }
-      return p;
-    });
-    saveProductsToStorage(updated);
-  };
 
   // Preset loading trigger
   const handleInitiateLoadPreset = (preset) => {
     setSelectedPresetToLoad(preset);
-    setLoadMode('add'); // default safe mode
+    setLoadMode('add');
     setShowPresetModal(false);
     setShowLoadConfirmModal(true);
   };
@@ -392,7 +350,6 @@ export default function InventoryPage() {
   const handleExecuteLoadPreset = () => {
     if (!selectedPresetToLoad || !selectedPresetToLoad.products) return;
 
-    // Create deep copy with fresh IDs
     const preparedProducts = selectedPresetToLoad.products.map((p, idx) => ({
       id: Date.now() + idx + Math.floor(Math.random() * 1000),
       name: p.name,
@@ -405,7 +362,6 @@ export default function InventoryPage() {
     if (loadMode === 'replace') {
       finalProducts = preparedProducts;
     } else {
-      // Add mode: avoid exact name duplicates (case-insensitive)
       const existingNames = new Set(products.map((p) => p.name.toLowerCase().trim()));
       const uniqueNewProducts = preparedProducts.filter(
         (p) => !existingNames.has(p.name.toLowerCase().trim())
@@ -449,7 +405,6 @@ export default function InventoryPage() {
     setShowSavePresetModal(false);
     showToast(`Preset "${newCustomPreset.name}" berhasil disimpan!`);
   };
->>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
 
   const getStockBadge = (stock) => {
     if (stock === 0) {
@@ -490,12 +445,6 @@ export default function InventoryPage() {
           <p className="eyebrow">Management Hub</p>
           <h2 className="page-title">Manajemen Stok Produk</h2>
         </div>
-<<<<<<< HEAD
-        <div className="header-actions">
-          <button className="btn-secondary" type="button" onClick={promptReset}>
-            <Trash2 size={15} />
-            Reset data
-=======
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={() => setShowPresetModal(true)}
@@ -511,7 +460,6 @@ export default function InventoryPage() {
             className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-4 py-2.5 rounded-xl text-xs transition"
           >
             Reset Data (0)
->>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
           </button>
           <button className="btn-primary" type="button" onClick={() => setShowAddModal(true)}>
             <PackagePlus size={15} />
@@ -626,8 +574,6 @@ export default function InventoryPage() {
         </div>
       </div>
 
-<<<<<<< HEAD
-=======
       {/* Modal: Preset Data Explorer */}
       {showPresetModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
@@ -850,7 +796,6 @@ export default function InventoryPage() {
       )}
 
       {/* Modal Tambah Produk */}
->>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
@@ -912,7 +857,7 @@ export default function InventoryPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Harga Satuan (Rp)</label>
-                <input type="text" required value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: formatNumberInput(e.target.value) })} onBlur={(e) => handlePriceBlur(e.target.value, 'edit', 'price')} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-medium" />
+                <input type="text" required value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: formatNumberInput(e.target.value) }) } onBlur={(e) => handlePriceBlur(e.target.value, 'edit', 'price')} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-medium" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Jumlah Stok</label>
