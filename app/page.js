@@ -107,7 +107,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="dashboard-wrap">
+    <div className="dashboard-wrap text-slate-100">
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce">
           {toastMessage}
