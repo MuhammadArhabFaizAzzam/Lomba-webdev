@@ -17,11 +17,14 @@ export default function TransactionsPage() {
 
   const filteredTransactions = useMemo(() => {
     const query = searchTerm.toLowerCase();
-    return transactions.filter((tx) =>
-      String(tx.id).toLowerCase().includes(query)
-      || String(tx.items).toLowerCase().includes(query)
-      || String(tx.payment).toLowerCase().includes(query)
-    );
+    return transactions.filter((tx) => {
+      const matchId = String(tx.id || '').toLowerCase().includes(query);
+      const matchPayment = String(tx.payment || '').toLowerCase().includes(query);
+      const matchItems = Array.isArray(tx.items) && tx.items.some(item =>
+        String(item?.name || '').toLowerCase().includes(query)
+      );
+      return matchId || matchPayment || matchItems;
+    });
   }, [transactions, searchTerm]);
 
   const totalRevenue = transactions.reduce((sum, tx) => sum + Number(tx.total || 0), 0);
@@ -30,13 +33,18 @@ export default function TransactionsPage() {
     if (filteredTransactions.length === 0) return;
 
     const headers = ['ID Transaksi', 'Waktu', 'Detail Item', 'Metode Pembayaran', 'Total'];
-    const rows = filteredTransactions.map(tx => [
-      `"${String(tx.id).replace(/"/g, '""')}"`,
-      `"${String(tx.date).replace(/"/g, '""')}"`,
-      `"${String(tx.items).replace(/"/g, '""')}"`,
-      `"${String(tx.payment).replace(/"/g, '""')}"`,
-      `"${String(tx.total)}"`
-    ]);
+    const rows = filteredTransactions.map(tx => {
+      const itemsSummary = Array.isArray(tx.items)
+        ? tx.items.map(i => `${i.name} (${i.qty}x)`).join(', ')
+        : String(tx.items || '');
+      return [
+        `"${String(tx.id).replace(/"/g, '""')}"`,
+        `"${String(tx.date).replace(/"/g, '""')}"`,
+        `"${itemsSummary.replace(/"/g, '""')}"`,
+        `"${String(tx.payment).replace(/"/g, '""')}"`,
+        `"${String(tx.total)}"`
+      ];
+    });
 
     const csvContent = [
       headers.map(h => `"${h}"`).join(','),
@@ -74,13 +82,6 @@ export default function TransactionsPage() {
             </svg>
             <span>Export CSV</span>
           </button>
-          <input
-            type="text"
-            placeholder="Cari ID / Item / Metode..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:w-64 px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-white"
-          />
         </div>
       </div>
 

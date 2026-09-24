@@ -148,7 +148,6 @@ export default function InventoryPage() {
             };
           });
           setProducts(normalized);
-          // Save back the normalized unique IDs to storage
           localStorage.setItem('zenith_products', JSON.stringify(normalized));
           localStorage.setItem('umkm_products', JSON.stringify(normalized));
         } else {
@@ -174,10 +173,15 @@ export default function InventoryPage() {
     }
   }, []);
 
-  const persistProducts = (nextProducts) => {
-    setProducts(nextProducts);
-    localStorage.setItem('zenith_products', JSON.stringify(nextProducts));
-    localStorage.setItem('umkm_products', JSON.stringify(nextProducts));
+  const saveProductsToStorage = (updatedProducts) => {
+    setProducts(updatedProducts);
+    localStorage.setItem('zenith_products', JSON.stringify(updatedProducts));
+    localStorage.setItem('umkm_products', JSON.stringify(updatedProducts));
+  };
+
+  const saveCustomPresetsToStorage = (updatedPresets) => {
+    setCustomPresets(updatedPresets);
+    localStorage.setItem('zenith_presets', JSON.stringify(updatedPresets));
   };
 
   const showToast = (msg) => {
@@ -207,17 +211,6 @@ export default function InventoryPage() {
     return cleanValue ? Number(cleanValue) : '';
   };
 
-  const saveProductsToStorage = (updatedProducts) => {
-    setProducts(updatedProducts);
-    localStorage.setItem('zenith_products', JSON.stringify(updatedProducts));
-    localStorage.setItem('umkm_products', JSON.stringify(updatedProducts));
-  };
-
-  const saveCustomPresetsToStorage = (updatedPresets) => {
-    setCustomPresets(updatedPresets);
-    localStorage.setItem('zenith_presets', JSON.stringify(updatedPresets));
-  };
-
   const handleAddProduct = (e) => {
     e.preventDefault();
     const rawPrice = parseNumberInput(form.price);
@@ -226,7 +219,7 @@ export default function InventoryPage() {
       return;
     }
 
-    const nextProducts = [{
+    const newProduct = {
       id: Date.now(),
       name: form.name.trim(),
       category: form.category,
@@ -279,11 +272,14 @@ export default function InventoryPage() {
   };
 
   const updateStock = (id, delta) => {
-    const updated = products.map((product) => {
-      if (product.id !== id) return product;
-      return { ...product, stock: Math.max(0, Number(product.stock || 0) + delta) };
+    const updated = products.map((p) => {
+      if (p.id === id) {
+        const newStock = Math.max(0, p.stock + delta);
+        return { ...p, stock: newStock };
+      }
+      return p;
     });
-    persistProducts(updated);
+    saveProductsToStorage(updated);
   };
 
   const promptDelete = (id) => {
@@ -336,21 +332,16 @@ export default function InventoryPage() {
     setConfirmModal({ isOpen: false, title: '', message: '', actionType: null, targetId: null });
   };
 
-  const updateStock = (id, delta) => {
-    const updated = products.map((p) => {
-      if (p.id === id) {
-        const newStock = Math.max(0, p.stock + delta);
-        return { ...p, stock: newStock };
-      }
-      return p;
-    });
-    saveProductsToStorage(updated);
-  };
+  const filteredProducts = useMemo(() => products.filter((product) => {
+    const matchesCategory = selectedCategory === 'Semua' || product.category === selectedCategory;
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  }), [products, searchQuery, selectedCategory]);
 
   // Preset loading trigger
   const handleInitiateLoadPreset = (preset) => {
     setSelectedPresetToLoad(preset);
-    setLoadMode('add'); // default safe mode
+    setLoadMode('add');
     setShowPresetModal(false);
     setShowLoadConfirmModal(true);
   };
@@ -359,7 +350,6 @@ export default function InventoryPage() {
   const handleExecuteLoadPreset = () => {
     if (!selectedPresetToLoad || !selectedPresetToLoad.products) return;
 
-    // Create deep copy with fresh IDs
     const preparedProducts = selectedPresetToLoad.products.map((p, idx) => ({
       id: Date.now() + idx + Math.floor(Math.random() * 1000),
       name: p.name,
@@ -372,7 +362,6 @@ export default function InventoryPage() {
     if (loadMode === 'replace') {
       finalProducts = preparedProducts;
     } else {
-      // Add mode: avoid exact name duplicates (case-insensitive)
       const existingNames = new Set(products.map((p) => p.name.toLowerCase().trim()));
       const uniqueNewProducts = preparedProducts.filter(
         (p) => !existingNames.has(p.name.toLowerCase().trim())
@@ -868,7 +857,7 @@ export default function InventoryPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Harga Satuan (Rp)</label>
-                <input type="text" required value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: formatNumberInput(e.target.value) })} onBlur={(e) => handlePriceBlur(e.target.value, 'edit', 'price')} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-medium" />
+                <input type="text" required value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: formatNumberInput(e.target.value) }) } onBlur={(e) => handlePriceBlur(e.target.value, 'edit', 'price')} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-medium" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Jumlah Stok</label>

@@ -139,14 +139,6 @@ export default function POSPage() {
     });
     setShowReceiptModal(true);
     setCart([]);
-<<<<<<< HEAD
-=======
-    setPaymentMethod('QRIS');
-
-    setTimeout(() => {
-      setSuccessMessage('');
-    }, 4000);
->>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
   };
 
   const handlePrintReceipt = () => {
@@ -255,7 +247,6 @@ export default function POSPage() {
           <button className="pill-button" type="button" onClick={() => setCart([])}>Reset</button>
         </div>
 
-<<<<<<< HEAD
         <div className="space-y-6">
           <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200 flex flex-col">
             <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-4">
@@ -263,19 +254,6 @@ export default function POSPage() {
               <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg">
                 {cart.reduce((sum, item) => sum + item.qty, 0)} Item
               </span>
-=======
-        {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-          {products.length === 0 ? (
-            <div className="col-span-full py-16 bg-white rounded-2xl border border-slate-200 text-center text-slate-400 text-sm font-medium p-8">
-              <p className="mb-3">Belum ada produk terdaftar di sistem POS.</p>
-              <Link
-                href="/inventory"
-                className="inline-block px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl hover:bg-indigo-500 transition shadow-sm"
-              >
-                + Tambah Produk di Manajemen Stok &rarr;
-              </Link>
->>>>>>> ace681d7ed129e49a4af4dc75983e4dbc153218c
             </div>
 
             <div className="space-y-3 mb-6">

@@ -1302,3 +1302,42 @@ h6,
     scroll-behavior: auto !important;
   }
 }
+
+/* 3D Depth & Tactile Enhancements */
+.metric-card,
+.stat-box,
+.chart-card,
+.summary-panel,
+.quick-panel,
+.tap-card,
+.overview-card,
+.welcome-card {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
+  will-change: transform, box-shadow;
+}
+
+.metric-card:hover,
+.stat-box:hover,
+.chart-card:hover,
+.summary-panel:hover,
+.overview-card:hover,
+.welcome-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -12px rgba(2, 6, 23, 0.45), 0 0 20px rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.btn-primary,
+.btn-secondary,
+.pill-button,
+.category-button,
+.payment-button {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.btn-primary:active,
+.btn-secondary:active,
+.pill-button:active {
+  transform: translateY(2px) scale(0.98);
+}
+
