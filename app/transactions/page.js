@@ -4,14 +4,16 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ReceiptText, Search, WalletCards } from 'lucide-react';
 import { formatRupiah } from '../utils/formatCurrency';
+import { normalizeTransaction, readStoredArray } from '../utils/storage';
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const saved = localStorage.getItem('zenith_transactions') || localStorage.getItem('umkm_transactions');
-    const loadTransactions = window.setTimeout(() => setTransactions(saved ? JSON.parse(saved) : []), 0);
+    const loadTransactions = window.setTimeout(() => {
+      setTransactions(readStoredArray('transactions').map(normalizeTransaction));
+    }, 0);
     return () => window.clearTimeout(loadTransactions);
   }, []);
 
@@ -42,7 +44,7 @@ export default function TransactionsPage() {
         `"${String(tx.date).replace(/"/g, '""')}"`,
         `"${itemsSummary.replace(/"/g, '""')}"`,
         `"${String(tx.payment).replace(/"/g, '""')}"`,
-        `"${String(tx.total)}"`
+        `"${String(tx.total).replace(/"/g, '""')}"`
       ];
     });
 
@@ -61,6 +63,7 @@ export default function TransactionsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -88,7 +91,9 @@ export default function TransactionsPage() {
       <div className="table-toolbar">
         <div className="search-field">
           <Search size={17} />
+          <label htmlFor="transaction-search" className="sr-only">Cari transaksi</label>
           <input
+            id="transaction-search"
             type="text"
             placeholder="Cari ID, item, atau metode pembayaran..."
             value={searchTerm}
@@ -127,7 +132,11 @@ export default function TransactionsPage() {
                   <tr key={tx.id}>
                     <td className="transaction-id">{tx.id}</td>
                     <td className="muted-cell">{tx.date}</td>
-                    <td className="item-cell">{tx.items}</td>
+                    <td className="item-cell">
+                      {Array.isArray(tx.items)
+                        ? tx.items.map((item) => `${item.name} (${item.qty}x)`).join(', ')
+                        : String(tx.items || '')}
+                    </td>
                     <td><span className="payment-badge"><WalletCards size={13} />{tx.payment}</span></td>
                     <td className="align-right amount-cell">{formatRupiah(tx.total)}</td>
                   </tr>

@@ -26,28 +26,7 @@ import {
   Cell,
 } from 'recharts';
 import { formatRupiah } from './utils/formatCurrency';
-
-const chartLineData = [
-  { day: 'Sen', value: 1200000 },
-  { day: 'Sel', value: 1800000 },
-  { day: 'Rab', value: 1450000 },
-  { day: 'Kam', value: 2250000 },
-  { day: 'Jum', value: 2100000 },
-  { day: 'Sab', value: 2600000 },
-  { day: 'Min', value: 2300000 },
-];
-
-const paymentData = [
-  { name: 'QRIS', value: 64 },
-  { name: 'Cash', value: 36 },
-];
-
-const categoryData = [
-  { name: 'Minuman', value: 36 },
-  { name: 'Makanan', value: 28 },
-  { name: 'Cemilan', value: 22 },
-  { name: 'Lainnya', value: 14 },
-];
+import { normalizeProduct, normalizeTransaction, readStoredArray, removeStoredArray } from './utils/storage';
 
 const COLORS = ['#8B5CF6', '#5EEAD4', '#60A5FA', '#FBBF24'];
 
@@ -57,8 +36,14 @@ export default function Dashboard() {
     totalTransactions: 0,
     totalProducts: 0,
     lowStockCount: 0,
+    todayRevenue: 0,
+    averageTransaction: 0,
+    topCategory: '-',
   });
   const [toastMessage, setToastMessage] = useState('');
+  const [chartData, setChartData] = useState([]);
+  const [paymentMix, setPaymentMix] = useState([]);
+  const [categoryMix, setCategoryMix] = useState([]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -66,42 +51,67 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    const savedProducts = localStorage.getItem('zenith_products') || localStorage.getItem('umkm_products');
-    const savedTransactions = localStorage.getItem('zenith_transactions') || localStorage.getItem('umkm_transactions');
-
-    const products = savedProducts ? JSON.parse(savedProducts) : [];
-    const transactions = savedTransactions ? JSON.parse(savedTransactions) : [];
+    const products = readStoredArray('products').map(normalizeProduct);
+    const transactions = readStoredArray('transactions').map(normalizeTransaction);
 
     const totalRevenue = transactions.reduce((sum, curr) => sum + Number(curr.total || 0), 0);
     const lowStockCount = products.filter((product) => Number(product.stock || 0) <= 5).length;
+    const today = new Date().toDateString();
+    const todayRevenue = transactions
+      .filter((transaction) => new Date(transaction.createdAt || transaction.date).toDateString() === today)
+      .reduce((sum, transaction) => sum + Number(transaction.total || 0), 0);
+    const paymentCounts = transactions.reduce((result, transaction) => {
+      result[transaction.payment] = (result[transaction.payment] || 0) + 1;
+      return result;
+    }, {});
+    const categoryCounts = transactions.flatMap((transaction) => transaction.items).reduce((result, item) => {
+      const category = products.find((product) => product.id === item.id)?.category || 'Lainnya';
+      result[category] = (result[category] || 0) + Number(item.qty || 0);
+      return result;
+    }, {});
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - (6 - index));
+      return date;
+    });
+    setChartData(days.map((day) => ({
+      day: day.toLocaleDateString('id-ID', { weekday: 'short' }),
+      value: transactions
+        .filter((transaction) => new Date(transaction.createdAt || transaction.date).toDateString() === day.toDateString())
+        .reduce((sum, transaction) => sum + Number(transaction.total || 0), 0),
+    })));
+    setPaymentMix(Object.entries(paymentCounts).map(([name, value]) => ({ name, value })));
+    setCategoryMix(Object.entries(categoryCounts).map(([name, value]) => ({ name, value })));
 
     setStats({
       totalRevenue,
       totalTransactions: transactions.length,
       totalProducts: products.length,
       lowStockCount,
+      todayRevenue,
+      averageTransaction: totalRevenue / Math.max(transactions.length, 1),
+      topCategory: Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '-',
     });
   }, []);
 
   const metrics = [
-    { label: 'Total Pendapatan', value: formatRupiah(stats.totalRevenue), trend: '+12.4%', icon: DollarSign, tone: 'primary' },
-    { label: 'Total Transaksi', value: String(stats.totalTransactions), trend: '+8.1%', icon: BarChart3, tone: 'secondary' },
-    { label: 'Produk Stok Rendah', value: String(stats.lowStockCount), trend: '-2.3%', icon: Warehouse, tone: 'warning' },
-    { label: 'Produk Aktif', value: String(stats.totalProducts), trend: '+5.8%', icon: PackageCheck, tone: 'danger' },
+    { label: 'Total Pendapatan', value: formatRupiah(stats.totalRevenue), trend: 'Aktual', icon: DollarSign, tone: 'primary' },
+    { label: 'Total Transaksi', value: String(stats.totalTransactions), trend: 'Aktual', icon: BarChart3, tone: 'secondary' },
+    { label: 'Produk Stok Rendah', value: String(stats.lowStockCount), trend: 'Perlu cek', icon: Warehouse, tone: 'warning' },
+    { label: 'Produk Aktif', value: String(stats.totalProducts), trend: 'Tersimpan', icon: PackageCheck, tone: 'danger' },
   ];
 
   const quickActions = [
-    { label: 'Buka Kasir', value: '3 menit terakhir', icon: ShoppingCart },
-    { label: 'Stok Menipis', value: '6 item butuh cek', icon: Warehouse },
-    { label: 'Laporan Harian', value: 'Ready to export', icon: BarChart3 },
+    { label: 'Buka Kasir', value: 'Mulai transaksi baru', icon: ShoppingCart },
+    { label: 'Stok Menipis', value: `${stats.lowStockCount} item perlu cek`, icon: Warehouse },
+    { label: 'Laporan Harian', value: `${stats.totalTransactions} transaksi tercatat`, icon: BarChart3 },
   ];
 
   const handleResetData = () => {
     if (confirm('Yakin ingin mereset seluruh data ke kondisi awal (0)?')) {
-      localStorage.removeItem('zenith_products');
-      localStorage.removeItem('umkm_products');
-      localStorage.removeItem('zenith_transactions');
-      localStorage.removeItem('umkm_transactions');
+      removeStoredArray('products');
+      removeStoredArray('transactions');
       window.location.reload();
     }
   };
@@ -111,6 +121,21 @@ export default function Dashboard() {
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce">
           {toastMessage}
+        </div>
+      )}
+
+      {stats.lowStockCount > 0 && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 flex items-center justify-between shadow-lg">
+          <div className="flex items-center space-x-3">
+            <span className="text-xl">⚠️</span>
+            <div>
+              <p className="font-bold text-sm">Perhatian: {stats.lowStockCount} Produk Menipis/Habis!</p>
+              <p className="text-xs text-amber-200/80">Segera lakukan restock barang di menu Manajemen Stok agar operasional kasir tidak terganggu.</p>
+            </div>
+          </div>
+          <Link href="/inventory" className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition shadow-md">
+            Cek Inventaris &rarr;
+          </Link>
         </div>
       )}
 
@@ -160,12 +185,12 @@ export default function Dashboard() {
 
           <div className="summary-figure">
             <strong>{formatRupiah(stats.totalRevenue)}</strong>
-            <span>+12.4%</span>
+            <span>{stats.totalTransactions ? 'Data aktual' : 'Belum ada data'}</span>
           </div>
 
           <div style={{ width: '100%', height: 210 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartLineData}>
+              <LineChart data={chartData}>
                 <CartesianGrid stroke="rgba(148, 163, 184, 0.15)" vertical={false} />
                 <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
@@ -204,33 +229,33 @@ export default function Dashboard() {
         <div className="stat-box">
           <div className="stat-label-row">
             <span className="stat-label">Omzet Hari Ini</span>
-            <span className="metric-trend"><ArrowUpRight size={12} />12.4%</span>
+            <span className="metric-trend"><ArrowUpRight size={12} />{stats.todayRevenue ? 'Aktual' : '-'}</span>
           </div>
-          <p className="stat-value">{formatRupiah(stats.totalRevenue * 0.42)}</p>
+          <p className="stat-value">{formatRupiah(stats.todayRevenue)}</p>
         </div>
 
         <div className="stat-box">
           <div className="stat-label-row">
             <span className="stat-label">Rata-rata Trx</span>
-            <span className="metric-trend"><ArrowUpRight size={12} />8.1%</span>
+            <span className="metric-trend"><ArrowUpRight size={12} />Aktual</span>
           </div>
-          <p className="stat-value">{formatRupiah(stats.totalRevenue / Math.max(stats.totalTransactions, 1))}</p>
+          <p className="stat-value">{formatRupiah(stats.averageTransaction)}</p>
         </div>
 
         <div className="stat-box">
           <div className="stat-label-row">
             <span className="stat-label">Kategori Terlaris</span>
-            <span className="metric-trend"><ArrowUpRight size={12} />36%</span>
+            <span className="metric-trend"><ArrowUpRight size={12} />Terlaris</span>
           </div>
-          <p className="stat-value">Minuman</p>
+          <p className="stat-value">{stats.topCategory}</p>
         </div>
 
         <div className="stat-box">
           <div className="stat-label-row">
             <span className="stat-label">Turnover Stok</span>
-            <span className="metric-trend"><ArrowDownRight size={12} />2.3%</span>
+            <span className="metric-trend"><ArrowDownRight size={12} />Demo</span>
           </div>
-          <p className="stat-value">68%</p>
+          <p className="stat-value">-</p>
         </div>
       </div>
 
@@ -240,17 +265,24 @@ export default function Dashboard() {
             <h3 className="panel-title">Metode Pembayaran</h3>
           </div>
           <div style={{ width: '100%', height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={paymentData}>
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#CBD5E1', fontSize: 12 }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
-                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                  {paymentData.map((entry, index) => (
-                    <Cell key={entry.name} fill={index === 0 ? '#8B5CF6' : '#5EEAD4'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {paymentMix.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center p-4">
+                <span className="font-semibold text-slate-300">Belum ada data pembayaran</span>
+                <span className="text-[11px] text-slate-500 mt-1">Grafik akan otomatis terisi saat ada transaksi kasir</span>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={paymentMix}>
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#CBD5E1', fontSize: 12 }} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
+                  <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                    {paymentMix.map((entry, index) => (
+                      <Cell key={entry.name} fill={index === 0 ? '#8B5CF6' : '#5EEAD4'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -259,15 +291,22 @@ export default function Dashboard() {
             <h3 className="panel-title">Kategori Produk</h3>
           </div>
           <div style={{ width: '100%', height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={categoryData} dataKey="value" nameKey="name" innerRadius={44} outerRadius={66} paddingAngle={4}>
-                  {categoryData.map((entry, index) => (
-                    <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
+            {categoryMix.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center p-4">
+                <span className="font-semibold text-slate-300">Belum ada kategori terjual</span>
+                <span className="text-[11px] text-slate-500 mt-1">Diagram lingkaran akan terbentuk setelah transaksi pertama</span>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={categoryMix} dataKey="value" nameKey="name" innerRadius={44} outerRadius={66} paddingAngle={4}>
+                    {categoryMix.map((entry, index) => (
+                      <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>

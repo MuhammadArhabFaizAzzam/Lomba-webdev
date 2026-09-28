@@ -87,6 +87,7 @@ export default function LoginPage() {
             </label>
             <input
               type="text"
+              autoComplete="username"
               required
               placeholder="Contoh: kasir atau management"
               value={username}
@@ -101,6 +102,7 @@ export default function LoginPage() {
             </label>
             <input
               type="password"
+              autoComplete="current-password"
               required
               placeholder="••••••••"
               value={password}
