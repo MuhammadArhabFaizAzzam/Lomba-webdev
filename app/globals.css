@@ -4,50 +4,34 @@
   --font-display: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
   --font-body: 'Inter', 'Segoe UI', sans-serif;
 
-  --bg-base: #070D18;
-  --bg-app: #0C1523;
-  --bg-canvas: #0D1829;
+  --bg-base: #060913;
+  --bg-app: #0A0F1D;
+  --bg-canvas: #0E1626;
 
-  --surface-1: #101C2F;
-  --surface-2: #15263E;
-  --surface-solid: #111C2A;
+  --surface-1: #111A2E;
+  --surface-2: #18253F;
+  --surface-solid: #131E35;
 
-  --border-default: #263752;
+  --border-default: #22324D;
+  --border-glow: rgba(139, 92, 246, 0.35);
 
-  --text-primary: #F4F7FF;
-  --text-secondary: #D7E1F3;
-  --text-tertiary: #9AA9C6;
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-tertiary: #94A3B8;
 
   --accent-primary: #8B5CF6;
-  --accent-secondary: #2DD4BF;
-  --accent-tertiary: #60A5FA;
+  --accent-secondary: #06B6D4;
+  --accent-tertiary: #38BDF8;
 
   --success: #34D399;
   --warning: #FBBF24;
   --danger: #F87171;
 
-  --glow-violet: rgba(139, 92, 246, 0.20);
+  --glow-violet: rgba(139, 92, 246, 0.25);
 
-  --z-base: 0;
-  --z-sticky-cta: 10;
-  --z-dropdown: 20;
-  --z-sidebar-mobile: 30;
-  --z-modal-backdrop: 40;
-  --z-modal: 50;
-  --z-toast: 60;
-
-  --shadow-card: 0 10px 24px rgba(2, 6, 23, 0.28);
-  --shadow-elevated: 0 18px 32px rgba(15, 23, 42, 0.32);
-  --shadow-modal: 0 24px 48px rgba(15, 23, 42, 0.42);
-  --shadow-cta-glow: 0 16px 34px var(--glow-violet);
-
-  --bp-sm: 480px;
-  --bp-md: 768px;
-  --bp-lg: 1024px;
-  --bp-xl: 1280px;
-
-  --touch-target-min: 44px;
-  --touch-target-comfortable: 48px;
+  --shadow-card: 0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.05) inset;
+  --shadow-elevated: 0 20px 40px -10px rgba(0, 0, 0, 0.6);
+  --shadow-cta-glow: 0 0 25px var(--glow-violet);
 }
 
 html {

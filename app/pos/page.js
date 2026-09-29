@@ -1,8 +1,8 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Minus, Plus, Search, Trash2 } from 'lucide-react';
+import { Minus, Plus, Search, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react';
 import { formatRupiah } from '../utils/formatCurrency';
 import {
   normalizeNonNegativeNumber,
@@ -25,8 +25,13 @@ export default function POSPage() {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
   const [cashReceived, setCashReceived] = useState('');
-  const [discountPercent, setDiscountPercent] = useState(0);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  // Role Mode: 'cashier' or 'admin'
+  const [roleMode, setRoleMode] = useState('cashier');
+  const [adminPinModal, setAdminPinModal] = useState(false);
+  const [adminPinInput, setAdminPinInput] = useState('');
+  const [discountPercent, setDiscountPercent] = useState(0);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -35,7 +40,6 @@ export default function POSPage() {
 
   useEffect(() => {
     setProducts(readStoredArray('products').map(normalizeProduct));
-
     const savedTheme = localStorage.getItem('zenith_pos_theme');
     setThemeMode(savedTheme || 'dark');
   }, []);
@@ -54,7 +58,7 @@ export default function POSPage() {
   }, [products, searchQuery, selectedCategory]);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const discountAmount = Math.round(subtotal * Math.min(100, Math.max(0, Number(discountPercent) || 0)) / 100);
+  const discountAmount = roleMode === 'admin' ? Math.round(subtotal * Math.min(100, Math.max(0, Number(discountPercent) || 0)) / 100) : 0;
   const total = Math.max(0, subtotal - discountAmount);
   const cashAmount = normalizeNonNegativeNumber(String(cashReceived).replace(/\D/g, ''));
   const change = Math.max(0, cashAmount - total);
@@ -137,7 +141,7 @@ export default function POSPage() {
       createdAt: now.toISOString(),
       payment: paymentMethod,
       subtotal,
-      discountPercent: Number(discountPercent) || 0,
+      discountPercent: roleMode === 'admin' ? Number(discountPercent) || 0 : 0,
       discountAmount,
       total,
       cashReceived: paymentMethod === 'Tunai' ? cashAmount : null,
@@ -185,14 +189,16 @@ export default function POSPage() {
     window.print();
   };
 
-  const getStockBadge = (stock) => {
-    if (stock === 0) {
-      return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">Stok Kosong</span>;
+  const handleVerifyAdminPin = (e) => {
+    e.preventDefault();
+    if (adminPinInput === '1234') {
+      setRoleMode('admin');
+      setAdminPinModal(false);
+      setAdminPinInput('');
+      showToast('Berhasil beralih ke Mode Admin!');
+    } else {
+      alert('PIN Admin salah! (Gunakan PIN demo: 1234)');
     }
-    if (stock >= 1 && stock <= 20) {
-      return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Stok Menipis ({stock})</span>;
-    }
-    return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Stok Normal ({stock})</span>;
   };
 
   return (
@@ -203,20 +209,77 @@ export default function POSPage() {
         </div>
       )}
 
+      {/* Admin PIN Modal */}
+      {adminPinModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-slate-800">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+              <h3 className="text-lg font-bold flex items-center space-x-2">
+                <ShieldAlert className="text-amber-500" size={20} />
+                <span>Otorisasi Admin</span>
+              </h3>
+              <button onClick={() => setAdminPinModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+            </div>
+            <form onSubmit={handleVerifyAdminPin} className="space-y-4">
+              <p className="text-xs text-slate-600">Masukkan PIN Admin untuk mengatur diskon atau mengubah konfigurasi khusus. <br/><strong className="text-indigo-600">(PIN Demo: 1234)</strong></p>
+              <input
+                type="password"
+                maxLength={4}
+                value={adminPinInput}
+                onChange={(e) => setAdminPinInput(e.target.value)}
+                placeholder="••••"
+                className="w-full text-center tracking-widest text-lg font-bold px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600"
+                autoFocus
+              />
+              <div className="flex space-x-3 pt-2">
+                <button type="button" onClick={() => setAdminPinModal(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition">Batal</button>
+                <button type="submit" className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition">Masuk Admin</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="pos-area">
-        <div className="pos-toolbar">
+        <div className="pos-toolbar flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h2 className="pos-title">Kasir Point of Sale</h2>
-            <p className="pos-subtitle">Pilih produk dan proses checkout dengan cepat.</p>
+            <p className="pos-subtitle">Pilih produk dan proses transaksi penjualan dengan cepat.</p>
           </div>
 
-          <button
-            type="button"
-            className="pill-button"
-            onClick={() => setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'))}
-          >
-            {themeMode === 'dark' ? 'Dark mode' : 'Light mode'}
-          </button>
+          <div className="flex items-center space-x-2">
+            {roleMode === 'cashier' ? (
+              <button
+                type="button"
+                onClick={() => setAdminPinModal(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition shadow-sm"
+              >
+                <ShieldAlert size={14} className="text-amber-400" />
+                <span>Mode Kasir (Ganti ke Admin)</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setRoleMode('cashier');
+                  setDiscountPercent(0);
+                  showToast('Kembali ke Mode Kasir');
+                }}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition"
+              >
+                <ShieldCheck size={14} />
+                <span>Mode Admin Aktif (Keluar)</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="pill-button"
+              onClick={() => setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+            >
+              {themeMode === 'dark' ? 'Dark mode' : 'Light mode'}
+            </button>
+          </div>
         </div>
 
         <div className="filter-row">
@@ -321,13 +384,13 @@ export default function POSPage() {
 
             <div className="space-y-2 mb-6 pt-4 border-t border-slate-100">
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">Metode Pembayaran</label>
-              <div className="grid grid-cols-3 gap-2">
-                {['QRIS', 'Tunai', 'Transfer'].map((method) => (
+              <div className="grid grid-cols-2 gap-2">
+                {['QRIS', 'Tunai', 'Transfer', 'Kartu Kredit / Debit'].map((method) => (
                   <button
                     key={method}
                     type="button"
                     onClick={() => setPaymentMethod(method)}
-                    className={`py-2 rounded-xl text-xs font-bold border transition ${
+                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition truncate ${
                       paymentMethod === method
                         ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
                         : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
@@ -340,36 +403,59 @@ export default function POSPage() {
             </div>
 
             <div className="pt-4 border-t border-slate-100 space-y-3">
-              <div className="flex justify-between items-center text-sm font-bold text-slate-900">
+              {roleMode === 'admin' && (
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-amber-800">
+                    <span>👑 Panel Kontrol Admin (Diskon)</span>
+                    <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded">Aktif</span>
+                  </div>
+                  <label className="block text-xs font-bold text-slate-700">
+                    Diskon Toko (%)
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={discountPercent}
+                      onChange={(event) => setDiscountPercent(event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm bg-white"
+                      placeholder="0"
+                    />
+                  </label>
+                </div>
+              )}
+
+              {subtotal > 0 && discountAmount > 0 && (
+                <div className="flex justify-between items-center text-xs text-slate-500">
+                  <span>Subtotal:</span>
+                  <span>{formatRupiah(subtotal)}</span>
+                </div>
+              )}
+
+              {discountAmount > 0 && (
+                <div className="flex justify-between items-center text-xs text-rose-600 font-semibold">
+                  <span>Diskon ({discountPercent}%):</span>
+                  <span>-{formatRupiah(discountAmount)}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center text-sm font-bold text-slate-900 pt-1 border-t border-slate-100">
                 <span>Total Pembayaran:</span>
                 <span className="text-lg font-extrabold text-indigo-600">{formatRupiah(total)}</span>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="text-xs font-bold text-slate-700">
-                  Diskon (%)
+
+              {paymentMethod === 'Tunai' && (
+                <label className="block text-xs font-bold text-slate-700">
+                  Uang diterima
                   <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={discountPercent}
-                    onChange={(event) => setDiscountPercent(event.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    value={cashReceived}
+                    onChange={(event) => setCashReceived(event.target.value.replace(/\D/g, ''))}
                     className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                    placeholder="Rp"
                   />
                 </label>
-                {paymentMethod === 'Tunai' && (
-                  <label className="text-xs font-bold text-slate-700">
-                    Uang diterima
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={cashReceived}
-                      onChange={(event) => setCashReceived(event.target.value.replace(/\D/g, ''))}
-                      className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
-                      placeholder="Rp"
-                    />
-                  </label>
-                )}
-              </div>
+              )}
               {paymentMethod === 'Tunai' && cashAmount >= total && (
                 <div className="text-right text-xs font-bold text-emerald-600">Kembalian: {formatRupiah(change)}</div>
               )}
