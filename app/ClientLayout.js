@@ -142,7 +142,7 @@ export default function ClientLayout({ children }) {
 
   const allNavigation = [
     {
-      name: 'Beranda / Selamat Datang',
+      name: 'Beranda',
       href: '/welcome',
       roles: ['guest', 'kasir', 'management'],
       icon: HomeIcon,
