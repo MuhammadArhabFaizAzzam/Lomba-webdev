@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { readStoredArray, normalizeProduct } from './utils/storage';
 
 const HomeIcon = ({ className = '' }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,6 +48,7 @@ export default function ClientLayout({ children }) {
   const [user, setUser] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [lowStockCount, setLowStockCount] = useState(0);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -72,11 +74,23 @@ export default function ClientLayout({ children }) {
     return null;
   };
 
+  const updateLowStockCount = () => {
+    try {
+      const products = readStoredArray('products').map(normalizeProduct);
+      const low = products.filter(p => p.stock <= 20).length;
+      setLowStockCount(low);
+    } catch (e) {
+      setLowStockCount(0);
+    }
+  };
+
   useEffect(() => {
     syncAuth();
+    updateLowStockCount();
 
     const handleAuthUpdate = () => {
       syncAuth();
+      updateLowStockCount();
     };
 
     window.addEventListener('zenith_auth_update', handleAuthUpdate);
@@ -91,6 +105,7 @@ export default function ClientLayout({ children }) {
   // Synchronize auth state on route changes
   useEffect(() => {
     syncAuth();
+    updateLowStockCount();
   }, [pathname]);
 
   // Route Guards & Guest / Authenticated Redirection Rules
@@ -170,6 +185,7 @@ export default function ClientLayout({ children }) {
       href: '/inventory',
       roles: ['management'],
       icon: InventoryIcon,
+      badge: lowStockCount > 0 ? lowStockCount : null,
     },
     {
       name: 'Panduan Sistem',
@@ -206,7 +222,7 @@ export default function ClientLayout({ children }) {
       )}
 
       {/* Sidebar for Desktop */}
-      <aside className="hidden md:flex md:w-64 bg-slate-900 text-white flex-col shadow-xl border-r border-slate-800 z-10">
+      <aside className="hidden md:flex md:w-64 bg-slate-900 text-white flex-col shadow-xl border-r border-slate-800 z-10 sticky top-0 h-screen overflow-y-auto">
         <div className="p-6 border-b border-slate-800">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white text-lg shadow-md shadow-indigo-600/30">
@@ -246,10 +262,17 @@ export default function ClientLayout({ children }) {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`nav-item ${isActive ? 'active' : ''}`}
+                className={`nav-item flex items-center justify-between ${isActive ? 'active' : ''}`}
               >
-                <Icon className="nav-icon"/>
-                <span>{item.name}</span>
+                <div className="flex items-center space-x-3">
+                  <Icon className="nav-icon"/>
+                  <span>{item.name}</span>
+                </div>
+                {item.badge && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-slate-950 shadow-xs animate-pulse">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -298,12 +321,19 @@ export default function ClientLayout({ children }) {
                 key={item.name}
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium ${
+                className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium ${
                   isActive ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800'
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span>{item.name}</span>
+                <div className="flex items-center space-x-3">
+                  <Icon className="w-5 h-5" />
+                  <span>{item.name}</span>
+                </div>
+                {item.badge && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-slate-950">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
