@@ -1,45 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Receipt,
+  Package,
+  BookOpen,
+  Home,
+  LogOut,
+  ShieldCheck,
+  UserCheck,
+  Menu,
+  X,
+  Sparkles,
+  AlertTriangle
+} from 'lucide-react';
 import { readStoredArray, normalizeProduct } from './utils/storage';
-
-const HomeIcon = ({ className = '' }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-  </svg>
-);
-
-const DashboardIcon = ({ className = '' }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-  </svg>
-);
-
-const PosIcon = ({ className = '' }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-  </svg>
-);
-
-const TransactionsIcon = ({ className = '' }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-  </svg>
-);
-
-const InventoryIcon = ({ className = '' }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-  </svg>
-);
-
-const GuideIcon = ({ className = '' }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-  </svg>
-);
 
 export default function ClientLayout({ children }) {
   const pathname = usePathname();
@@ -141,7 +120,7 @@ export default function ClientLayout({ children }) {
     if (freshUser && freshUser.role === 'kasir') {
       const kasirAllowed = ['/', '/welcome', '/pos', '/transactions'];
       if (!kasirAllowed.includes(pathname)) {
-        showToast('Akses Ditolak! Kasir tidak memiliki izin untuk mengakses halaman Manajemen Stok / Panduan.');
+        showToast('Akses Ditolak! Kasir tidak memiliki izin untuk mengakses Manajemen Stok atau Panduan.');
         router.push('/pos');
       }
     }
@@ -155,48 +134,108 @@ export default function ClientLayout({ children }) {
     router.push('/welcome');
   };
 
-  const allNavigation = [
-    {
-      name: 'Beranda',
-      href: '/welcome',
-      roles: ['guest', 'kasir', 'management'],
-      icon: HomeIcon,
-    },
-    {
-      name: 'Dashboard Bisnis',
-      href: '/',
-      roles: ['kasir', 'management'],
-      icon: DashboardIcon,
-    },
-    {
-      name: 'Kasir (POS)',
-      href: '/pos',
-      roles: ['kasir', 'management'],
-      icon: PosIcon,
-    },
-    {
-      name: 'Riwayat Transaksi',
-      href: '/transactions',
-      roles: ['kasir', 'management'],
-      icon: TransactionsIcon,
-    },
-    {
-      name: 'Manajemen Stok',
-      href: '/inventory',
-      roles: ['management'],
-      icon: InventoryIcon,
-      badge: lowStockCount > 0 ? lowStockCount : null,
-    },
-    {
-      name: 'Panduan Sistem',
-      href: '/guide',
-      roles: ['management'],
-      icon: GuideIcon,
-    },
-  ];
+  // Grouped Navigation separated for Admin (Management) vs Kasir
+  const navigationSections = useMemo(() => {
+    if (!user) return [];
 
-  const currentRoleKey = user ? user.role : null;
-  const navigation = user ? allNavigation.filter(item => item.roles.includes(currentRoleKey)) : [];
+    if (user.role === 'management') {
+      // Admin / Management Full Navigation
+      return [
+        {
+          title: 'ANALITIK & MONITORING',
+          items: [
+            {
+              name: 'Dashboard Bisnis',
+              href: '/',
+              icon: LayoutDashboard,
+              description: 'Statistik & grafik pendapatan',
+            },
+            {
+              name: 'Riwayat Transaksi',
+              href: '/transactions',
+              icon: Receipt,
+              description: 'Rekap penjualan & export CSV',
+            },
+          ],
+        },
+        {
+          title: 'OPERASIONAL TOKO',
+          items: [
+            {
+              name: 'Kasir Point of Sale',
+              href: '/pos',
+              icon: ShoppingCart,
+              description: 'Transaksi cepat & cetak struk',
+            },
+            {
+              name: 'Manajemen Stok',
+              href: '/inventory',
+              icon: Package,
+              badge: lowStockCount > 0 ? `${lowStockCount} Menipis` : null,
+              badgeType: 'warning',
+              description: 'Katalog produk & stok gudang',
+            },
+          ],
+        },
+        {
+          title: 'SISTEM & INFORMASI',
+          items: [
+            {
+              name: 'Panduan Sistem',
+              href: '/guide',
+              icon: BookOpen,
+              description: 'Alur evaluasi fitur aplikasi',
+            },
+            {
+              name: 'Halaman Beranda',
+              href: '/welcome',
+              icon: Home,
+              description: 'Portal sambutan platform',
+            },
+          ],
+        },
+      ];
+    } else {
+      // Kasir Specialized Navigation
+      return [
+        {
+          title: 'OPERASIONAL KASIR',
+          items: [
+            {
+              name: 'Buka Kasir (POS)',
+              href: '/pos',
+              icon: ShoppingCart,
+              highlight: true,
+              description: 'Input pesanan & cetak nota',
+            },
+            {
+              name: 'Riwayat Transaksi',
+              href: '/transactions',
+              icon: Receipt,
+              description: 'Daftar transaksi penjualan',
+            },
+          ],
+        },
+        {
+          title: 'INFORMASI UMUM',
+          items: [
+            {
+              name: 'Dashboard Ringkas',
+              href: '/',
+              icon: LayoutDashboard,
+              description: 'Ringkasan data operasional',
+            },
+            {
+              name: 'Halaman Beranda',
+              href: '/welcome',
+              icon: Home,
+              description: 'Portal informasi toko',
+            },
+          ],
+        },
+      ];
+    }
+  }, [user, lowStockCount]);
 
   if (!user && (pathname === '/welcome' || pathname === '/login')) {
     return (
@@ -222,74 +261,118 @@ export default function ClientLayout({ children }) {
       )}
 
       {/* Sidebar for Desktop */}
-      <aside className="hidden md:flex md:w-64 bg-slate-900 text-white flex-col shadow-xl border-r border-slate-800 z-10 sticky top-0 h-screen overflow-y-auto">
-        <div className="p-6 border-b border-slate-800">
+      <aside className="hidden md:flex md:w-68 bg-[#090E1A] text-white flex-col shadow-2xl border-r border-slate-800/80 z-20 sticky top-0 h-screen overflow-y-auto select-none">
+        {/* Brand Header */}
+        <div className="p-5 border-b border-slate-800/80 bg-[#0B1222]/60">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white text-lg shadow-md shadow-indigo-600/30">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center font-black text-white text-lg shadow-lg shadow-indigo-500/25">
               Z
             </div>
             <div>
-              <div className="brand-title">Zenith POS</div>
-              <div className="brand-subtitle">Retail & Business Hub</div>
+              <div className="font-extrabold text-base tracking-tight text-white flex items-center space-x-1.5">
+                <span>Zenith POS</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">PRO</span>
+              </div>
+              <div className="text-[11px] text-slate-400 font-medium">Digital Retail & POS Hub</div>
             </div>
           </div>
         </div>
 
+        {/* Role Badge & User Profile Info */}
         {user && (
-          <div className="mx-4 mt-4 p-3 bg-slate-800/80 rounded-xl border border-slate-700/60 flex items-center justify-between">
-            <div className="truncate">
-              <p className="text-xs font-bold text-white truncate">{user.username}</p>
-              <p className="text-[10px] uppercase tracking-wider font-semibold text-indigo-400">
-                Role: {user.role === 'kasir' ? 'Kasir' : 'Management'}
-              </p>
+          <div className="p-4 border-b border-slate-800/60 bg-[#0D1527]/50">
+            <div className={`p-3 rounded-xl border flex items-center justify-between ${
+              user.role === 'management'
+                ? 'bg-indigo-950/40 border-indigo-500/30 text-indigo-200'
+                : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
+            }`}>
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                  user.role === 'management' ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white'
+                }`}>
+                  {user.role === 'management' ? <ShieldCheck size={16} /> : <UserCheck size={16} />}
+                </div>
+                <div className="truncate">
+                  <div className="text-xs font-bold text-white truncate">{user.username}</div>
+                  <div className="text-[10px] font-semibold tracking-wide uppercase opacity-80">
+                    {user.role === 'management' ? 'Administrator' : 'Staf Kasir'}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                title="Keluar dari akun"
+                className="p-1.5 hover:bg-rose-900/60 text-slate-400 hover:text-rose-200 rounded-lg transition"
+              >
+                <LogOut size={14} />
+              </button>
             </div>
-            <button
-              onClick={handleLogout}
-              title="Logout"
-              className="px-2 py-1 bg-rose-900/60 hover:bg-rose-800 text-rose-200 rounded text-[11px] font-medium transition"
-            >
-              Keluar
-            </button>
           </div>
         )}
 
-        <nav className="flex-1 p-4 space-y-1.5">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href;
-            const Icon = item.icon;
+        {/* Grouped Navigation Links */}
+        <nav className="flex-1 p-3.5 space-y-6">
+          {navigationSections.map((section, idx) => (
+            <div key={idx} className="space-y-1.5">
+              <div className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                <span>{section.title}</span>
+              </div>
+              <div className="space-y-1">
+                {section.items.map((item) => {
+                  const isActive = pathname === item.href;
+                  const Icon = item.icon;
 
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`nav-item flex items-center justify-between ${isActive ? 'active' : ''}`}
-              >
-                <div className="flex items-center space-x-3">
-                  <Icon className="nav-icon"/>
-                  <span>{item.name}</span>
-                </div>
-                {item.badge && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-slate-950 shadow-xs animate-pulse">
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={`group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                        isActive
+                          ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30 font-bold border border-indigo-400/30'
+                          : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3 truncate">
+                        <Icon size={16} className={`shrink-0 transition-transform group-hover:scale-110 ${
+                          isActive ? 'text-white' : 'text-slate-400 group-hover:text-indigo-400'
+                        }`} />
+                        <span className="truncate">{item.name}</span>
+                      </div>
+                      {item.badge && (
+                        <span className="ml-2 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500 text-slate-950 flex items-center space-x-1 shrink-0">
+                          <AlertTriangle size={10} />
+                          <span>{item.badge}</span>
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        <div className="sidebar-footer">Zenith POS v2.0 • Professional Suite</div>
+        {/* Sidebar Footer */}
+        <div className="p-4 border-t border-slate-800/80 bg-[#0B1222]/40 text-center">
+          <div className="text-[11px] font-medium text-slate-400 flex items-center justify-center space-x-1">
+            <Sparkles size={12} className="text-indigo-400" />
+            <span>Zenith POS v2.0</span>
+          </div>
+          <div className="text-[10px] text-slate-400 mt-0.5">SME Digital Transformation</div>
+        </div>
       </aside>
 
       {/* Mobile Top Navigation */}
-      <div className="md:hidden bg-slate-900 text-white p-4 flex items-center justify-between shadow-md z-10">
+      <div className="md:hidden bg-[#090E1A] text-white p-4 flex items-center justify-between shadow-md z-20 border-b border-slate-800">
         <div className="flex items-center space-x-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white text-sm">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white text-sm shadow-md">
             Z
           </div>
           <div>
-            <span className="font-bold text-base tracking-tight block">Zenith POS</span>
-            <span className="text-[10px] text-indigo-400 uppercase">{user ? user.role : ''}</span>
+            <span className="font-bold text-sm tracking-tight block">Zenith POS</span>
+            <span className="text-[10px] text-indigo-400 uppercase font-semibold">
+              {user ? (user.role === 'management' ? 'Admin' : 'Kasir') : ''}
+            </span>
           </div>
         </div>
         <div className="flex items-center space-x-2">
@@ -303,53 +386,66 @@ export default function ClientLayout({ children }) {
           )}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="text-slate-300 hover:text-white focus:outline-none p-2 rounded-lg bg-slate-800 text-xs font-semibold"
+            className="text-slate-300 hover:text-white p-2 rounded-lg bg-slate-800 text-xs font-semibold"
           >
-            {mobileMenuOpen ? 'Tutup' : 'Menu'}
+            {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Dropdown Menu */}
+      {/* Mobile Dropdown Menu with Grouped Sections */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-slate-900 text-white border-t border-slate-800 p-4 space-y-2 shadow-lg z-10">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href;
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium ${
-                  isActive ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  <Icon className="w-5 h-5" />
-                  <span>{item.name}</span>
-                </div>
-                {item.badge && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-slate-950">
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+        <div className="md:hidden bg-[#090E1A] text-white border-t border-slate-800 p-4 space-y-4 shadow-xl z-20 max-h-[80vh] overflow-y-auto">
+          {navigationSections.map((section, idx) => (
+            <div key={idx} className="space-y-1.5">
+              <div className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {section.title}
+              </div>
+              <div className="space-y-1">
+                {section.items.map((item) => {
+                  const isActive = pathname === item.href;
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold ${
+                        isActive ? 'bg-indigo-600 text-white font-bold' : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Icon size={16} />
+                        <span>{item.name}</span>
+                      </div>
+                      {item.badge && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500 text-slate-950">
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-h-screen overflow-y-auto">
-        <header className="bg-white border-b border-slate-200 px-8 py-4 hidden md:flex items-center justify-between shadow-xs z-0">
-          <div className="text-sm font-medium text-slate-600 flex items-center space-x-2">
-            <span>Login sebagai:</span>
+        <header className="bg-white border-b border-slate-200 px-8 py-3.5 hidden md:flex items-center justify-between shadow-xs z-10 sticky top-0">
+          <div className="text-xs font-medium text-slate-600 flex items-center space-x-2">
+            <span>Sesi Aktif:</span>
             {user && (
               <>
                 <span className="font-bold text-slate-900">{user.username}</span>
-                <span className="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-50 text-indigo-700 uppercase">
-                  {user.role}
+                <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
+                  user.role === 'management'
+                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                }`}>
+                  {user.role === 'management' ? 'Administrator' : 'Kasir'}
                 </span>
               </>
             )}
