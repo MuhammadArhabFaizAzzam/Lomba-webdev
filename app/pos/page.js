@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Minus, Plus, Search, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react';
+import { Minus, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react';
 import { formatRupiah } from '../utils/formatCurrency';
 import {
   normalizeNonNegativeNumber,
@@ -26,12 +26,6 @@ export default function POSPage() {
   const [receiptData, setReceiptData] = useState(null);
   const [cashReceived, setCashReceived] = useState('');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-
-  // Role Mode: 'cashier' or 'admin'
-  const [roleMode, setRoleMode] = useState('cashier');
-  const [adminPinModal, setAdminPinModal] = useState(false);
-  const [adminPinInput, setAdminPinInput] = useState('');
-  const [discountPercent, setDiscountPercent] = useState(0);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -57,9 +51,7 @@ export default function POSPage() {
     });
   }, [products, searchQuery, selectedCategory]);
 
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const discountAmount = roleMode === 'admin' ? Math.round(subtotal * Math.min(100, Math.max(0, Number(discountPercent) || 0)) / 100) : 0;
-  const total = Math.max(0, subtotal - discountAmount);
+  const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   const cashAmount = normalizeNonNegativeNumber(String(cashReceived).replace(/\D/g, ''));
   const change = Math.max(0, cashAmount - total);
 
@@ -140,9 +132,9 @@ export default function POSPage() {
       date: dateStr,
       createdAt: now.toISOString(),
       payment: paymentMethod,
-      subtotal,
-      discountPercent: roleMode === 'admin' ? Number(discountPercent) || 0 : 0,
-      discountAmount,
+      subtotal: total,
+      discountPercent: 0,
+      discountAmount: 0,
       total,
       cashReceived: paymentMethod === 'Tunai' ? cashAmount : null,
       change: paymentMethod === 'Tunai' ? change : null,
@@ -172,7 +164,7 @@ export default function POSPage() {
       payment: transaction.payment,
       total: transaction.total,
       subtotal: transaction.subtotal,
-      discountAmount: transaction.discountAmount,
+      discountAmount: 0,
       cashReceived: transaction.cashReceived,
       change: transaction.change,
       cartItems: transaction.items,
@@ -180,7 +172,6 @@ export default function POSPage() {
     setShowReceiptModal(true);
     setCart([]);
     setCashReceived('');
-    setDiscountPercent(0);
     setPaymentMethod('QRIS');
     setIsCheckingOut(false);
   };
@@ -189,54 +180,11 @@ export default function POSPage() {
     window.print();
   };
 
-  const handleVerifyAdminPin = (e) => {
-    e.preventDefault();
-    if (adminPinInput === '1234') {
-      setRoleMode('admin');
-      setAdminPinModal(false);
-      setAdminPinInput('');
-      showToast('Berhasil beralih ke Mode Admin!');
-    } else {
-      alert('PIN Admin salah! (Gunakan PIN demo: 1234)');
-    }
-  };
-
   return (
     <div className="pos-shell">
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce">
           {toastMessage}
-        </div>
-      )}
-
-      {/* Admin PIN Modal */}
-      {adminPinModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-slate-800">
-            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
-              <h3 className="text-lg font-bold flex items-center space-x-2">
-                <ShieldAlert className="text-amber-500" size={20} />
-                <span>Otorisasi Admin</span>
-              </h3>
-              <button onClick={() => setAdminPinModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
-            </div>
-            <form onSubmit={handleVerifyAdminPin} className="space-y-4">
-              <p className="text-xs text-slate-600">Masukkan PIN Admin untuk mengatur diskon atau mengubah konfigurasi khusus. <br/><strong className="text-indigo-600">(PIN Demo: 1234)</strong></p>
-              <input
-                type="password"
-                maxLength={4}
-                value={adminPinInput}
-                onChange={(e) => setAdminPinInput(e.target.value)}
-                placeholder="••••"
-                className="w-full text-center tracking-widest text-lg font-bold px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-600"
-                autoFocus
-              />
-              <div className="flex space-x-3 pt-2">
-                <button type="button" onClick={() => setAdminPinModal(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition">Batal</button>
-                <button type="submit" className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition">Masuk Admin</button>
-              </div>
-            </form>
-          </div>
         </div>
       )}
 
@@ -248,30 +196,6 @@ export default function POSPage() {
           </div>
 
           <div className="flex items-center space-x-2">
-            {roleMode === 'cashier' ? (
-              <button
-                type="button"
-                onClick={() => setAdminPinModal(true)}
-                className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition shadow-sm"
-              >
-                <ShieldAlert size={14} className="text-amber-400" />
-                <span>Mode Kasir (Ganti ke Admin)</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setRoleMode('cashier');
-                  setDiscountPercent(0);
-                  showToast('Kembali ke Mode Kasir');
-                }}
-                className="flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition"
-              >
-                <ShieldCheck size={14} />
-                <span>Mode Admin Aktif (Keluar)</span>
-              </button>
-            )}
-
             <button
               type="button"
               className="pill-button"
@@ -403,42 +327,7 @@ export default function POSPage() {
             </div>
 
             <div className="pt-4 border-t border-slate-100 space-y-3">
-              {roleMode === 'admin' && (
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-amber-800">
-                    <span>👑 Panel Kontrol Admin (Diskon)</span>
-                    <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded">Aktif</span>
-                  </div>
-                  <label className="block text-xs font-bold text-slate-700">
-                    Diskon Toko (%)
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={discountPercent}
-                      onChange={(event) => setDiscountPercent(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm bg-white"
-                      placeholder="0"
-                    />
-                  </label>
-                </div>
-              )}
-
-              {subtotal > 0 && discountAmount > 0 && (
-                <div className="flex justify-between items-center text-xs text-slate-500">
-                  <span>Subtotal:</span>
-                  <span>{formatRupiah(subtotal)}</span>
-                </div>
-              )}
-
-              {discountAmount > 0 && (
-                <div className="flex justify-between items-center text-xs text-rose-600 font-semibold">
-                  <span>Diskon ({discountPercent}%):</span>
-                  <span>-{formatRupiah(discountAmount)}</span>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center text-sm font-bold text-slate-900 pt-1 border-t border-slate-100">
+              <div className="flex justify-between items-center text-sm font-bold text-slate-900">
                 <span>Total Pembayaran:</span>
                 <span className="text-lg font-extrabold text-indigo-600">{formatRupiah(total)}</span>
               </div>
@@ -516,16 +405,6 @@ export default function POSPage() {
               </div>
 
               <div className="space-y-1.5 pb-4 border-b border-dashed border-slate-300 text-sm">
-                <div className="flex justify-between text-xs text-slate-600">
-                  <span>Subtotal:</span>
-                  <span>{formatRupiah(receiptData.subtotal)}</span>
-                </div>
-                {receiptData.discountAmount > 0 && (
-                  <div className="flex justify-between text-xs text-rose-600">
-                    <span>Diskon:</span>
-                    <span>-{formatRupiah(receiptData.discountAmount)}</span>
-                  </div>
-                )}
                 <div className="flex justify-between font-extrabold text-slate-900 text-base pt-1">
                   <span>TOTAL:</span>
                   <span className="text-indigo-600">{formatRupiah(receiptData.total)}</span>
