@@ -2,6 +2,9 @@ const STORAGE_ALIASES = {
   products: ['zenith_products', 'umkm_products'],
   transactions: ['zenith_transactions', 'umkm_transactions'],
   presets: ['zenith_presets'],
+  shifts: ['zenith_shifts'],
+  audit_logs: ['zenith_audit_logs'],
+  kds_orders: ['zenith_kds_orders'],
 };
 
 const parseArray = (value) => {
