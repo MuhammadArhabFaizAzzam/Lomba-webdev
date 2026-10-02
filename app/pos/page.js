@@ -14,6 +14,21 @@ import {
 
 const categories = ['Semua', 'Makanan', 'Minuman', 'Cemilan', 'Lainnya'];
 
+const formatProductName = (name) => {
+  if (!name) return '';
+  return String(name)
+    .toLowerCase()
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+const getStockBadgeStyle = (stock) => {
+  if (stock === 0) return { bg: 'rgba(248, 113, 113, 0.12)', color: 'var(--danger)', text: 'Habis' };
+  if (stock <= 10) return { bg: 'rgba(251, 191, 36, 0.12)', color: 'var(--warning)', text: `${stock} stok` };
+  return { bg: 'rgba(52, 211, 153, 0.08)', color: 'var(--success)', text: `${stock} stok` };
+};
+
 export default function POSPage() {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
@@ -26,6 +41,10 @@ export default function POSPage() {
   const [receiptData, setReceiptData] = useState(null);
   const [cashReceived, setCashReceived] = useState('');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  // Dynamic QRIS States
+  const [activeQrisOrder, setActiveQrisOrder] = useState(null);
+  const [qrisTimer, setQrisTimer] = useState(300);
 
   // Shift Kasir States
   const [activeShift, setActiveShift] = useState(null);
@@ -66,6 +85,22 @@ export default function POSPage() {
     document.body.setAttribute('data-theme', themeMode === 'light' ? 'pos-light' : 'dark');
     localStorage.setItem('zenith_pos_theme', themeMode);
   }, [themeMode]);
+
+  useEffect(() => {
+    let timer;
+    if (activeQrisOrder && activeQrisOrder.status === 'PENDING' && qrisTimer > 0) {
+      timer = setInterval(() => {
+        setQrisTimer((prev) => {
+          if (prev <= 1) {
+            setActiveQrisOrder((curr) => curr ? { ...curr, status: 'EXPIRED' } : null);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [activeQrisOrder, qrisTimer]);
 
   const handleStartShift = (e) => {
     e.preventDefault();
@@ -182,8 +217,118 @@ export default function POSPage() {
     }
   };
 
+  const handleStartQrisCheckout = () => {
+    if (cart.length === 0 || isCheckingOut) return;
+    const currentProducts = readStoredArray('products').map(normalizeProduct);
+    const hasInsufficientStock = cart.some((item) => {
+      const current = currentProducts.find((product) => product.id === item.id);
+      return !current || current.stock < item.qty;
+    });
+    if (hasInsufficientStock) {
+      setProducts(currentProducts);
+      showToast('Stok berubah. Periksa kembali keranjang Anda.');
+      return;
+    }
+
+    const qrisId = `QRIS-${Date.now()}`;
+    setActiveQrisOrder({
+      id: qrisId,
+      amount: total,
+      items: [...cart],
+      createdAt: new Date().toLocaleDateString('id-ID') + ' ' + new Date().toTimeString().slice(0, 5),
+      status: 'PENDING',
+    });
+    setQrisTimer(300);
+    showToast('QRIS Pembayaran dibuat. Silakan scan.');
+  };
+
+  const handleSimulateQrisPaid = () => {
+    if (!activeQrisOrder) return;
+    const currentProducts = readStoredArray('products').map(normalizeProduct);
+
+    const now = new Date();
+    const transactionId = `TRX-${now.getTime()}`;
+    const dateStr = now.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }) + ' ' + now.toTimeString().slice(0, 5);
+
+    const transaction = normalizeTransaction({
+      id: transactionId,
+      date: dateStr,
+      createdAt: now.toISOString(),
+      payment: 'QRIS (Dynamic)',
+      subtotal: activeQrisOrder.amount,
+      discountPercent: 0,
+      discountAmount: 0,
+      total: activeQrisOrder.amount,
+      cashReceived: null,
+      change: null,
+      items: activeQrisOrder.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        qty: item.qty,
+      })),
+    });
+
+    const nextTransactions = [transaction, ...readStoredArray('transactions')];
+    writeStoredArray('transactions', nextTransactions);
+
+    // Update active shift stats if active
+    if (activeShift) {
+      const updatedShift = {
+        ...activeShift,
+        nonCashSales: activeShift.nonCashSales + activeQrisOrder.amount,
+        transactionsCount: activeShift.transactionsCount + 1,
+      };
+      setActiveShift(updatedShift);
+      localStorage.setItem('zenith_active_shift', JSON.stringify(updatedShift));
+    }
+
+    const kdsStatuses = readStoredArray('kds_statuses');
+    writeStoredArray('kds_statuses', [{ id: transactionId, status: 'PENDING' }, ...kdsStatuses]);
+
+    const updatedProducts = currentProducts.map((product) => {
+      const cartItem = activeQrisOrder.items.find((item) => item.id === product.id);
+      if (!cartItem) return product;
+      return { ...product, stock: Math.max(0, Number(product.stock || 0) - cartItem.qty) };
+    });
+
+    setProducts(updatedProducts);
+    writeStoredArray('products', updatedProducts);
+
+    setReceiptData({
+      id: transaction.id,
+      date: transaction.date,
+      payment: transaction.payment,
+      total: transaction.total,
+      subtotal: transaction.subtotal,
+      discountAmount: 0,
+      cashReceived: null,
+      change: null,
+      cartItems: transaction.items,
+    });
+    setShowReceiptModal(true);
+    setCart([]);
+    setActiveQrisOrder(null);
+    setPaymentMethod('QRIS');
+    showToast('Pembayaran QRIS Berhasil & Lunas!');
+  };
+
+  const handleCancelQris = () => {
+    setActiveQrisOrder(null);
+    showToast('QRIS dibatalkan.');
+  };
+
   const handleCheckout = () => {
     if (cart.length === 0 || isCheckingOut) return;
+
+    if (paymentMethod === 'QRIS') {
+      handleStartQrisCheckout();
+      return;
+    }
 
     if (paymentMethod === 'Tunai' && cashAmount < total) {
       showToast('Nominal tunai belum mencukupi.');
@@ -282,14 +427,6 @@ export default function POSPage() {
     window.print();
   };
 
-  const handleSendWhatsApp = () => {
-    if (!receiptData) return;
-    const itemsText = receiptData.cartItems.map(i => `- ${i.name} (${i.qty}x @${formatRupiah(i.price)})`).join('\n');
-    const msg = `*STRUK BELANJA - ZENITH POS*\n\nNo: ${receiptData.id}\nWaktu: ${receiptData.date}\nMetode: ${receiptData.payment}\n\n*Daftar Belanja:*\n${itemsText}\n\n*TOTAL: ${formatRupiah(receiptData.total)}*\n${receiptData.payment === 'Tunai' ? `Tunai: ${formatRupiah(receiptData.cashReceived)}\nKembali: ${formatRupiah(receiptData.change)}\n` : ''}\nTerima kasih telah berbelanja di toko kami!`;
-    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
-  };
-
   return (
     <div className="pos-shell">
       {toastMessage && (
@@ -348,10 +485,10 @@ export default function POSPage() {
             </p>
             
             <div style={{ background: 'var(--bg-canvas)', padding: '14px', borderRadius: '12px', border: '1px solid var(--border-default)', marginBottom: '18px', display: 'grid', gap: '8px', fontSize: '0.8rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'between', color: 'var(--text-secondary)' }}><span>Modal Awal:</span><span style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{formatRupiah(activeShift?.startingCash || 0)}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'between', color: 'var(--text-secondary)' }}><span>Penjualan Tunai:</span><span style={{ fontFamily: 'monospace', color: 'var(--success)' }}>{formatRupiah(activeShift?.cashSales || 0)}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'between', color: 'var(--text-secondary)' }}><span>Penjualan Non-Tunai:</span><span style={{ fontFamily: 'monospace', color: 'var(--accent-tertiary)' }}>{formatRupiah(activeShift?.nonCashSales || 0)}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'between', fontWeight: 'bold', color: 'var(--text-primary)', borderTop: '1px solid var(--border-default)', paddingTop: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}><span>Modal Awal:</span><span style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{formatRupiah(activeShift?.startingCash || 0)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}><span>Penjualan Tunai:</span><span style={{ fontFamily: 'monospace', color: 'var(--success)' }}>{formatRupiah(activeShift?.cashSales || 0)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}><span>Penjualan Non-Tunai:</span><span style={{ fontFamily: 'monospace', color: 'var(--accent-tertiary)' }}>{formatRupiah(activeShift?.nonCashSales || 0)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: 'var(--text-primary)', borderTop: '1px solid var(--border-default)', paddingTop: '8px' }}>
                 <span>Ekspektasi Uang di Laci:</span>
                 <span style={{ fontFamily: 'monospace', color: 'var(--accent-secondary)' }}>{formatRupiah((activeShift?.startingCash || 0) + (activeShift?.cashSales || 0))}</span>
               </div>
@@ -437,8 +574,8 @@ export default function POSPage() {
       <div className="pos-area">
         <div className="pos-toolbar flex flex-wrap justify-between items-center gap-3">
           <div>
-            <h2 className="pos-title">Kasir Point of Sale</h2>
-            <p className="pos-subtitle">Pilih produk dan proses transaksi penjualan dengan cepat.</p>
+            <h2 className="pos-title" style={{ color: 'var(--text-primary)', fontWeight: 800 }}>Kasir Point of Sale</h2>
+            <p className="pos-subtitle" style={{ color: 'var(--text-secondary)' }}>Pilih produk dan proses transaksi penjualan dengan cepat.</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -505,26 +642,38 @@ export default function POSPage() {
             </Link>
           </div>
         ) : (
-          <div className="product-grid" style={{ marginTop: 18 }}>
-            {filteredProducts.map((product) => (
-              <button key={product.id} type="button" className="tap-card" onClick={() => addToCart(product)}>
-                <div className="product-head">
-                  <div>
-                    <div className="product-meta">{product.category}</div>
-                    <h3 className="product-name">{product.name}</h3>
+          <div className="product-grid" style={{ marginTop: 18, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', paddingRight: '4px' }}>
+            {filteredProducts.map((product) => {
+              const badge = getStockBadgeStyle(product.stock);
+              const isOutOfStock = product.stock <= 0;
+              return (
+                <button
+                  key={product.id}
+                  type="button"
+                  className={`tap-card ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => addToCart(product)}
+                  disabled={isOutOfStock}
+                >
+                  <div className="product-head">
+                    <div>
+                      <div className="product-meta">{product.category}</div>
+                      <h3 className="product-name">{formatProductName(product.name)}</h3>
+                    </div>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '5px 8px', background: badge.bg, color: badge.color, fontSize: '0.68rem', fontWeight: 700 }}>
+                      {badge.text}
+                    </span>
                   </div>
-                  <span className="product-stock">{product.stock} stok</span>
-                </div>
 
-                <div>
-                  <div className="product-price">{formatRupiah(product.price)}</div>
-                  <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>Tambah ke keranjang</span>
-                    <span style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--surface-1)', display: 'grid', placeItems: 'center' }}><Plus size={14} /></span>
+                  <div>
+                    <div className="product-price">{formatRupiah(product.price)}</div>
+                    <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>{isOutOfStock ? 'Stok Kosong' : 'Tambah ke keranjang'}</span>
+                      <span style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--surface-1)', display: 'grid', placeItems: 'center' }}><Plus size={14} /></span>
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -546,98 +695,144 @@ export default function POSPage() {
         </div>
 
         <div style={{ display: 'grid', gap: '16px' }}>
-          <div style={{ background: 'var(--surface-2)', borderRadius: '16px', padding: '16px', border: '1px solid var(--border-default)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-default)', marginBottom: '14px' }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>Keranjang Pesanan</h3>
-              <span style={{ padding: '4px 10px', background: 'rgba(139,92,246,0.15)', color: 'var(--accent-primary)', fontSize: '0.75rem', fontWeight: 700, borderRadius: '8px' }}>
-                {cart.reduce((sum, item) => sum + item.qty, 0)} Item
-              </span>
-            </div>
+          {activeQrisOrder && activeQrisOrder.status === 'PENDING' ? (
+            <div style={{ background: 'var(--surface-2)', borderRadius: '16px', padding: '16px', border: '1px solid var(--border-default)', textAlign: 'center', display: 'grid', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-default)', paddingBottom: '8px' }}>
+                <span className="eyebrow" style={{ color: 'var(--accent-secondary)' }}>QRIS Dinamis</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--warning)' }}>
+                  {Math.floor(qrisTimer / 60)}:{(qrisTimer % 60).toString().padStart(2, '0')}
+                </span>
+              </div>
 
-            <div style={{ display: 'grid', gap: '10px', marginBottom: '16px' }}>
-              {cart.length === 0 ? (
-                <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.78rem' }}>
-                  Keranjang masih kosong. Pilih produk dari katalog di samping.
+              <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: '12px', display: 'grid', placeItems: 'center', width: '180px', margin: '0 auto' }}>
+                <div style={{ width: '140px', height: '140px', background: '#0A0F1D', display: 'grid', placeItems: 'center', borderRadius: '8px', color: '#F8FAFC', fontSize: '0.7rem', textAlign: 'center', padding: '10px', fontWeight: 'bold' }}>
+                  [ QR CODE ]<br/>
+                  <span style={{ fontSize: '0.55rem', color: '#38BDF8' }}>{activeQrisOrder.id}</span>
                 </div>
-              ) : (
-                cart.map((item) => (
-                  <div key={item.id} style={{ padding: '10px 12px', background: 'var(--surface-1)', borderRadius: '12px', border: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <h4 style={{ fontSize: '0.8rem', fontWeight: 700, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h4>
-                      <p style={{ fontSize: '0.72rem', color: 'var(--accent-secondary)', fontWeight: 800, margin: 0 }}>{formatRupiah(item.price)}</p>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                      <button type="button" onClick={() => updateQty(item.id, -1)} aria-label={`Kurangi ${item.name}`} style={{ width: 22, height: 22, background: 'var(--surface-2)', color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 700, borderRadius: 6, border: '1px solid var(--border-default)', display: 'grid', placeItems: 'center' }}>-</button>
-                      <span style={{ width: 20, textAlign: 'center', fontSize: '0.8rem', fontWeight: 700 }}>{item.qty}</span>
-                      <button type="button" onClick={() => updateQty(item.id, 1)} aria-label={`Tambah ${item.name}`} style={{ width: 22, height: 22, background: 'var(--surface-2)', color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 700, borderRadius: 6, border: '1px solid var(--border-default)', display: 'grid', placeItems: 'center' }}>+</button>
-                      <button type="button" onClick={() => verifyManagerPin(`Hapus ${item.name}`, () => removeFromCart(item.id))} aria-label={`Hapus ${item.name}`} style={{ color: 'var(--text-tertiary)', background: 'none', padding: '2px', cursor: 'pointer' }} title="Hapus">&times;</button>
-                    </div>
+              </div>
+
+              <div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 4px' }}>Total Tagihan QRIS</p>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--accent-secondary)', margin: 0 }}>{formatRupiah(activeQrisOrder.amount)}</h3>
+              </div>
+
+              <div style={{ padding: '6px 12px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '8px', fontSize: '0.72rem', color: 'var(--warning)', fontWeight: 700 }}>
+                Menunggu Scan & Pembayaran...
+              </div>
+
+              <div style={{ display: 'grid', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={handleSimulateQrisPaid}
+                  className="btn-primary"
+                  style={{ width: '100%', background: 'var(--success)', color: '#060913', fontSize: '0.8rem' }}
+                >
+                  Simulasi: Konfirmasi Lunas (Paid)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelQris}
+                  className="btn-secondary"
+                  style={{ width: '100%', fontSize: '0.8rem' }}
+                >
+                  Batalkan / Buat QR Baru
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ background: 'var(--surface-2)', borderRadius: '16px', padding: '16px', border: '1px solid var(--border-default)', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-default)', marginBottom: '14px' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Keranjang Pesanan</h3>
+                <span style={{ padding: '4px 10px', background: 'rgba(139,92,246,0.15)', color: 'var(--accent-primary)', fontSize: '0.75rem', fontWeight: 700, borderRadius: '8px' }}>
+                  {cart.reduce((sum, item) => sum + item.qty, 0)} Item
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gap: '10px', marginBottom: '16px' }}>
+                {cart.length === 0 ? (
+                  <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.78rem' }}>
+                    Keranjang masih kosong. Pilih produk dari katalog di samping.
                   </div>
-                ))
-              )}
-            </div>
-
-            <div style={{ display: 'grid', gap: '8px', marginBottom: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-default)' }}>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Metode Pembayaran</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                {['QRIS', 'Tunai', 'Transfer', 'Kartu Kredit / Debit'].map((method) => (
-                  <button
-                    key={method}
-                    type="button"
-                    onClick={() => setPaymentMethod(method)}
-                    style={{
-                      padding: '8px 10px',
-                      borderRadius: '10px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      border: '1px solid',
-                      borderColor: paymentMethod === method ? 'var(--accent-primary)' : 'var(--border-default)',
-                      background: paymentMethod === method ? 'rgba(139,92,246,0.15)' : 'var(--surface-1)',
-                      color: paymentMethod === method ? 'var(--text-primary)' : 'var(--text-secondary)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {method}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border-default)', display: 'grid', gap: '10px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem', fontWeight: 700 }}>
-                <span>Total Pembayaran:</span>
-                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-secondary)' }}>{formatRupiah(total)}</span>
+                ) : (
+                  cart.map((item) => (
+                    <div key={item.id} style={{ padding: '10px 12px', background: 'var(--surface-1)', borderRadius: '12px', border: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <h4 style={{ fontSize: '0.8rem', fontWeight: 700, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>{formatProductName(item.name)}</h4>
+                        <p style={{ fontSize: '0.72rem', color: 'var(--accent-secondary)', fontWeight: 800, margin: 0 }}>{formatRupiah(item.price)}</p>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                        <button type="button" onClick={() => updateQty(item.id, -1)} aria-label={`Kurangi ${item.name}`} style={{ width: 22, height: 22, background: 'var(--surface-2)', color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 700, borderRadius: 6, border: '1px solid var(--border-default)', display: 'grid', placeItems: 'center' }}>-</button>
+                        <span style={{ width: 20, textAlign: 'center', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.qty}</span>
+                        <button type="button" onClick={() => updateQty(item.id, 1)} aria-label={`Tambah ${item.name}`} style={{ width: 22, height: 22, background: 'var(--surface-2)', color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 700, borderRadius: 6, border: '1px solid var(--border-default)', display: 'grid', placeItems: 'center' }}>+</button>
+                        <button type="button" onClick={() => verifyManagerPin(`Hapus ${item.name}`, () => removeFromCart(item.id))} aria-label={`Hapus ${item.name}`} style={{ color: 'var(--text-tertiary)', background: 'none', padding: '2px', cursor: 'pointer' }} title="Hapus">&times;</button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
 
-              {paymentMethod === 'Tunai' && (
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                  Uang diterima
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={cashReceived}
-                    onChange={(event) => setCashReceived(event.target.value.replace(/\D/g, ''))}
-                    className="input"
-                    style={{ marginTop: '4px' }}
-                    placeholder="Rp"
-                  />
-                </label>
-              )}
-              {paymentMethod === 'Tunai' && cashAmount >= total && (
-                <div style={{ textAlign: 'right', fontSize: '0.75rem', fontWeight: 700, color: 'var(--success)' }}>Kembalian: {formatRupiah(change)}</div>
-              )}
-              <button
-                onClick={handleCheckout}
-                disabled={cart.length === 0 || isCheckingOut}
-                className="btn-primary"
-                style={{ width: '100%', marginTop: '4px' }}
-              >
-                Proses Checkout & Cetak Struk
-              </button>
+              <div style={{ display: 'grid', gap: '8px', marginBottom: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-default)' }}>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Metode Pembayaran</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                  {['QRIS', 'Tunai', 'Transfer', 'Kartu Kredit / Debit'].map((method) => (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => setPaymentMethod(method)}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '10px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        border: '1px solid',
+                        borderColor: paymentMethod === method ? 'var(--accent-primary)' : 'var(--border-default)',
+                        background: paymentMethod === method ? 'rgba(139,92,246,0.15)' : 'var(--surface-1)',
+                        color: paymentMethod === method ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {method}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border-default)', display: 'grid', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  <span>Total Pembayaran:</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-secondary)' }}>{formatRupiah(total)}</span>
+                </div>
+
+                {paymentMethod === 'Tunai' && (
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                    Uang diterima
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={cashReceived}
+                      onChange={(event) => setCashReceived(event.target.value.replace(/\D/g, ''))}
+                      className="input"
+                      style={{ marginTop: '4px' }}
+                      placeholder="Rp"
+                    />
+                  </label>
+                )}
+                {paymentMethod === 'Tunai' && cashAmount >= total && (
+                  <div style={{ textAlign: 'right', fontSize: '0.75rem', fontWeight: 700, color: 'var(--success)' }}>Kembalian: {formatRupiah(change)}</div>
+                )}
+                <button
+                  onClick={handleCheckout}
+                  disabled={cart.length === 0 || isCheckingOut}
+                  className="btn-primary"
+                  style={{ width: '100%', marginTop: '4px' }}
+                >
+                  {paymentMethod === 'QRIS' ? 'Buat QRIS Pembayaran' : 'Proses Checkout & Cetak Struk'}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </aside>
 
@@ -674,7 +869,7 @@ export default function POSPage() {
                 </div>
                 {receiptData.cartItems.map((item, idx) => (
                   <div key={idx} style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '4px', alignItems: 'center' }}>
-                    <span style={{ gridColumn: 'span 5', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</span>
+                    <span style={{ gridColumn: 'span 5', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatProductName(item.name)}</span>
                     <span style={{ gridColumn: 'span 3', textAlign: 'center', color: 'var(--text-secondary)' }}>{formatRupiah(item.price)}</span>
                     <span style={{ gridColumn: 'span 1', textAlign: 'center', fontWeight: 700 }}>{item.qty}</span>
                     <span style={{ gridColumn: 'span 3', textAlign: 'right', fontWeight: 700, color: 'var(--accent-secondary)' }}>{formatRupiah(item.price * item.qty)}</span>
@@ -702,16 +897,6 @@ export default function POSPage() {
             </div>
 
             <div style={{ marginTop: '20px', paddingTop: '14px', borderTop: '1px solid var(--border-default)', display: 'grid', gap: '10px' }} className="print:hidden">
-              <button
-                type="button"
-                onClick={handleSendWhatsApp}
-                className="btn-primary"
-                style={{ background: 'var(--success)', color: '#060913', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-              >
-                <MessageCircle size={16} />
-                <span>Kirim Struk via WhatsApp</span>
-              </button>
-
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button type="button" onClick={() => setShowReceiptModal(false)} className="btn-secondary" style={{ flex: 1 }}>Tutup</button>
                 <button type="button" onClick={handlePrintReceipt} className="btn-primary" style={{ flex: 1 }}>Cetak (PDF)</button>
