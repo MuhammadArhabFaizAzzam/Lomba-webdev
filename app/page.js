@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpRight,
@@ -11,6 +11,10 @@ import {
   Plus,
   ShoppingCart,
   Warehouse,
+  TrendingUp,
+  Clock,
+  ShieldCheck,
+  Tag,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -24,26 +28,22 @@ import {
   PieChart,
   Pie,
   Cell,
+  Tooltip,
+  Legend,
+  LabelList,
 } from 'recharts';
 import { formatRupiah } from './utils/formatCurrency';
 import { normalizeProduct, normalizeTransaction, readStoredArray, removeStoredArray } from './utils/storage';
 
-const COLORS = ['#8B5CF6', '#5EEAD4', '#60A5FA', '#FBBF24'];
+const COLORS = ['#8B5CF6', '#38BDF8', '#34D399', '#FBBF24', '#F87171'];
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({
-    totalRevenue: 0,
-    totalTransactions: 0,
-    totalProducts: 0,
-    lowStockCount: 0,
-    todayRevenue: 0,
-    averageTransaction: 0,
-    topCategory: '-',
-  });
+  const [currentUser, setCurrentUser] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [activeShift, setActiveShift] = useState(null);
+  const [timeRange, setTimeRange] = useState('7days'); // 'today' | '7days' | '30days' | 'all'
   const [toastMessage, setToastMessage] = useState('');
-  const [chartData, setChartData] = useState([]);
-  const [paymentMix, setPaymentMix] = useState([]);
-  const [categoryMix, setCategoryMix] = useState([]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -51,69 +51,176 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    const products = readStoredArray('products').map(normalizeProduct);
-    const transactions = readStoredArray('transactions').map(normalizeTransaction);
+    const authUser = localStorage.getItem('zenith_auth_user');
+    if (authUser) {
+      try {
+        setCurrentUser(JSON.parse(authUser));
+      } catch {
+        setCurrentUser(null);
+      }
+    }
 
-    const totalRevenue = transactions.reduce((sum, curr) => sum + Number(curr.total || 0), 0);
-    const lowStockCount = products.filter((product) => Number(product.stock || 0) <= 5).length;
-    const today = new Date().toDateString();
-    const todayRevenue = transactions
-      .filter((transaction) => new Date(transaction.createdAt || transaction.date).toDateString() === today)
-      .reduce((sum, transaction) => sum + Number(transaction.total || 0), 0);
-    const paymentCounts = transactions.reduce((result, transaction) => {
-      result[transaction.payment] = (result[transaction.payment] || 0) + 1;
-      return result;
-    }, {});
-    const categoryCounts = transactions.flatMap((transaction) => transaction.items).reduce((result, item) => {
-      const category = products.find((product) => product.id === item.id)?.category || 'Lainnya';
-      result[category] = (result[category] || 0) + Number(item.qty || 0);
-      return result;
-    }, {});
-    const days = Array.from({ length: 7 }, (_, index) => {
-      const date = new Date();
-      date.setHours(0, 0, 0, 0);
-      date.setDate(date.getDate() - (6 - index));
-      return date;
-    });
-    setChartData(days.map((day) => ({
-      day: day.toLocaleDateString('id-ID', { weekday: 'short' }),
-      value: transactions
-        .filter((transaction) => new Date(transaction.createdAt || transaction.date).toDateString() === day.toDateString())
-        .reduce((sum, transaction) => sum + Number(transaction.total || 0), 0),
-    })));
-    setPaymentMix(Object.entries(paymentCounts).map(([name, value]) => ({ name, value })));
-    setCategoryMix(Object.entries(categoryCounts).map(([name, value]) => ({ name, value })));
+    const loadedProducts = readStoredArray('products').map(normalizeProduct);
+    const loadedTransactions = readStoredArray('transactions').map(normalizeTransaction);
+    setProducts(loadedProducts);
+    setTransactions(loadedTransactions);
 
-    setStats({
-      totalRevenue,
-      totalTransactions: transactions.length,
-      totalProducts: products.length,
-      lowStockCount,
-      todayRevenue,
-      averageTransaction: totalRevenue / Math.max(transactions.length, 1),
-      topCategory: Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '-',
-    });
+    const savedShift = localStorage.getItem('zenith_active_shift');
+    if (savedShift) {
+      try {
+        setActiveShift(JSON.parse(savedShift));
+      } catch {
+        setActiveShift(null);
+      }
+    }
   }, []);
 
+  const isAdmin = currentUser?.role === 'management';
+
+  // Filtered transactions based on timeRange
+  const filteredTransactions = useMemo(() => {
+    const now = new Date();
+    now.setHours(23, 59, 59, 999);
+
+    if (timeRange === 'today') {
+      const todayStr = new Date().toDateString();
+      return transactions.filter(tx => new Date(tx.createdAt || tx.date).toDateString() === todayStr);
+    }
+    if (timeRange === '7days') {
+      const limit = new Date();
+      limit.setDate(limit.getDate() - 7);
+      return transactions.filter(tx => new Date(tx.createdAt || tx.date) >= limit);
+    }
+    if (timeRange === '30days') {
+      const limit = new Date();
+      limit.setDate(limit.getDate() - 30);
+      return transactions.filter(tx => new Date(tx.createdAt || tx.date) >= limit);
+    }
+    return transactions;
+  }, [transactions, timeRange]);
+
+  // Analytics Calculations
+  const totalRevenue = useMemo(() => filteredTransactions.reduce((sum, tx) => sum + Number(tx.total || 0), 0), [filteredTransactions]);
+  const totalTransactionsCount = filteredTransactions.length;
+  const averageTransaction = totalTransactionsCount > 0 ? totalRevenue / totalTransactionsCount : 0;
+
+  const todayStr = new Date().toDateString();
+  const todayRevenue = useMemo(() => transactions
+    .filter(tx => new Date(tx.createdAt || tx.date).toDateString() === todayStr)
+    .reduce((sum, tx) => sum + Number(tx.total || 0), 0), [transactions, todayStr]);
+
+  const lowStockCount = useMemo(() => products.filter(p => Number(p.stock || 0) <= 5).length, [products]);
+  const totalProductsCount = products.length;
+
+  // Estimated Gross Profit (assuming 30% margin)
+  const estimatedGrossProfit = totalRevenue * 0.30;
+
+  // Top Selling Products
+  const topSellingProducts = useMemo(() => {
+    const map = {};
+    filteredTransactions.forEach(tx => {
+      if (Array.isArray(tx.items)) {
+        tx.items.forEach(item => {
+          const key = item.name || 'Produk';
+          if (!map[key]) {
+            map[key] = { name: key, qty: 0, revenue: 0 };
+          }
+          map[key].qty += Number(item.qty || 0);
+          map[key].revenue += Number(item.price || 0) * Number(item.qty || 0);
+        });
+      }
+    });
+    return Object.values(map).sort((a, b) => b.qty - a.qty).slice(0, 5);
+  }, [filteredTransactions]);
+
+  // Stock Turnover Ratio Calculation
+  const stockTurnover = useMemo(() => {
+    const totalSold = filteredTransactions.flatMap(tx => tx.items || []).reduce((sum, i) => sum + Number(i.qty || 0), 0);
+    const totalStock = products.reduce((sum, p) => sum + Number(p.stock || 0), 0);
+    if (totalStock === 0 && totalSold === 0) return '0.0x';
+    const ratio = (totalSold / Math.max(totalStock, 1)).toFixed(1);
+    return `${ratio}x`;
+  }, [filteredTransactions, products]);
+
+  // Payment Mix
+  const paymentMix = useMemo(() => {
+    const counts = filteredTransactions.reduce((acc, tx) => {
+      const method = tx.payment || 'QRIS';
+      acc[method] = (acc[method] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [filteredTransactions]);
+
+  // Category Mix
+  const categoryMix = useMemo(() => {
+    const counts = filteredTransactions.flatMap(tx => tx.items || []).reduce((acc, item) => {
+      const prod = products.find(p => p.id === item.id || p.name === item.name);
+      const cat = prod?.category || 'Lainnya';
+      acc[cat] = (acc[cat] || 0) + Number(item.qty || 0);
+      return acc;
+    }, {});
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [filteredTransactions, products]);
+
+  // Chart Data (7 days or daily breakdown for selected range)
+  const chartData = useMemo(() => {
+    const daysCount = timeRange === '30days' ? 30 : 7;
+    const days = Array.from({ length: daysCount }, (_, index) => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - (daysCount - 1 - index));
+      return date;
+    });
+
+    return days.map((day) => {
+      const dayStr = day.toDateString();
+      const dayTxs = transactions.filter(tx => new Date(tx.createdAt || tx.date).toDateString() === dayStr);
+      const value = dayTxs.reduce((sum, tx) => sum + Number(tx.total || 0), 0);
+      return {
+        date: day.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+        day: day.toLocaleDateString('id-ID', { weekday: 'short' }),
+        value,
+        count: dayTxs.length,
+      };
+    });
+  }, [transactions, timeRange]);
+
   const metrics = [
-    { label: 'Total Pendapatan', value: formatRupiah(stats.totalRevenue), trend: 'Aktual', icon: DollarSign, tone: 'primary' },
-    { label: 'Total Transaksi', value: String(stats.totalTransactions), trend: 'Aktual', icon: BarChart3, tone: 'secondary' },
-    { label: 'Produk Stok Rendah', value: String(stats.lowStockCount), trend: 'Perlu cek', icon: Warehouse, tone: 'warning' },
-    { label: 'Produk Aktif', value: String(stats.totalProducts), trend: 'Tersimpan', icon: PackageCheck, tone: 'danger' },
+    { label: 'Total Pendapatan', value: formatRupiah(totalRevenue), trend: timeRange === 'today' ? 'Hari Ini' : timeRange === '7days' ? '7 Hari' : 'Semua', icon: DollarSign, tone: 'primary' },
+    { label: 'Total Transaksi', value: String(totalTransactionsCount), trend: 'Aktual', icon: BarChart3, tone: 'secondary' },
+    { label: 'Produk Stok Rendah', value: String(lowStockCount), trend: lowStockCount > 0 ? 'Perlu Restock' : 'Aman', icon: Warehouse, tone: 'warning' },
+    { label: 'Estimasi Laba Kotor', value: formatRupiah(estimatedGrossProfit), trend: 'Margin ~30%', icon: TrendingUp, tone: 'danger' },
   ];
 
   const quickActions = [
-    { label: 'Buka Kasir', value: 'Mulai transaksi baru', icon: ShoppingCart },
-    { label: 'Stok Menipis', value: `${stats.lowStockCount} item perlu cek`, icon: Warehouse },
-    { label: 'Laporan Harian', value: `${stats.totalTransactions} transaksi tercatat`, icon: BarChart3 },
+    { label: 'Buka Kasir', value: 'Mulai transaksi baru', icon: ShoppingCart, href: '/pos' },
+    { label: 'Manajemen Stok', value: `${lowStockCount} item perlu restock`, icon: Warehouse, href: '/inventory' },
+    { label: 'Riwayat Transaksi', value: `${transactions.length} total tercatat`, icon: BarChart3, href: '/transactions' },
   ];
 
   const handleResetData = () => {
     if (confirm('Yakin ingin mereset seluruh data ke kondisi awal (0)?')) {
       removeStoredArray('products');
       removeStoredArray('transactions');
+      removeStoredArray('shift_history');
+      localStorage.removeItem('zenith_active_shift');
       window.location.reload();
     }
+  };
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-slate-900 border border-slate-700 p-3 rounded-xl shadow-xl text-xs text-white">
+          <p className="font-bold text-indigo-400 mb-1">{data.date} ({data.day})</p>
+          <p className="text-slate-200">Omzet: <span className="font-bold text-emerald-400">{formatRupiah(data.value)}</span></p>
+          <p className="text-slate-300">Transaksi: <span className="font-bold">{data.count}x</span></p>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -124,21 +231,44 @@ export default function Dashboard() {
         </div>
       )}
 
-      {stats.lowStockCount > 0 && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 flex items-center justify-between shadow-lg">
+      {/* Low Stock Alert Banner (Clickable) */}
+      {lowStockCount > 0 && (
+        <Link href="/inventory?filter=low" className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 flex items-center justify-between shadow-lg hover:bg-amber-500/15 transition group">
           <div className="flex items-center space-x-3">
             <span className="text-xl">⚠️</span>
             <div>
-              <p className="font-bold text-sm">Perhatian: {stats.lowStockCount} Produk Menipis/Habis!</p>
-              <p className="text-xs text-amber-200/80">Segera lakukan restock barang di menu Manajemen Stok agar operasional kasir tidak terganggu.</p>
+              <p className="font-bold text-sm">Perhatian: {lowStockCount} Produk Menipis/Habis!</p>
+              <p className="text-xs text-amber-200/80">Klik di sini untuk segera lakukan restock barang di menu Manajemen Stok.</p>
             </div>
           </div>
-          <Link href="/inventory" className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition shadow-md">
+          <span className="px-4 py-2 bg-amber-500 group-hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition shadow-md">
             Cek Inventaris &rarr;
+          </span>
+        </Link>
+      )}
+
+      {/* Active Shift Summary Banner */}
+      {activeShift && (
+        <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 flex flex-wrap items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+              <Clock size={18} />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-sm text-white">Shift Kasir Aktif</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">ONLINE</span>
+              </div>
+              <p className="text-xs text-indigo-300">Mulai: {activeShift.startTime} | Kas Awal: {formatRupiah(activeShift.startingCash)} | Total Trx Shift: {activeShift.transactionsCount}x</p>
+            </div>
+          </div>
+          <Link href="/pos" className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition">
+            Buka Kasir &rarr;
           </Link>
         </div>
       )}
 
+      {/* Hero Section */}
       <div className="dashboard-hero">
         <div className="hero-copy">
           <span className="eyebrow">Zenith POS Analytics Hub</span>
@@ -147,10 +277,12 @@ export default function Dashboard() {
         </div>
 
         <div className="hero-actions">
-          <button className="btn-secondary" type="button" onClick={handleResetData}>
-            <Plus size={15} />
-            Reset data
-          </button>
+          {isAdmin && (
+            <button className="btn-secondary" type="button" onClick={handleResetData} title="Reset seluruh data demo">
+              <Plus size={15} />
+              Reset data
+            </button>
+          )}
           <Link href="/pos" className="btn-primary">
             <ShoppingCart size={15} />
             Buka Kasir
@@ -158,6 +290,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Metrics Grid */}
       <div className="metric-grid">
         {metrics.map(({ label, value, trend, icon: Icon, tone }) => (
           <div key={label} className={`metric-card ${tone}`}>
@@ -176,93 +309,162 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Main Analytics Section (Trend & Quick Actions) */}
       <div className="dashboard-main">
         <div className="summary-panel">
           <div className="panel-head">
-            <h3 className="panel-title">Trend Penjualan</h3>
-            <button className="pill-button" type="button">7 Hari</button>
+            <div>
+              <h3 className="panel-title">Trend Pendapatan &amp; Omzet</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Grafik interaktif kinerja penjualan</p>
+            </div>
+            <div className="flex items-center space-x-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700">
+              <button
+                type="button"
+                onClick={() => setTimeRange('today')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${timeRange === 'today' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Hari Ini
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimeRange('7days')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${timeRange === '7days' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                7 Hari
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimeRange('30days')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${timeRange === '30days' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                30 Hari
+              </button>
+            </div>
           </div>
 
           <div className="summary-figure">
-            <strong>{formatRupiah(stats.totalRevenue)}</strong>
-            <span>{stats.totalTransactions ? 'Data aktual' : 'Belum ada data'}</span>
+            <strong>{formatRupiah(totalRevenue)}</strong>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">
+              {totalTransactionsCount > 0 ? `${totalTransactionsCount} Transaksi (${timeRange})` : 'Belum ada transaksi'}
+            </span>
           </div>
 
           <div style={{ width: '100%', height: 210 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid stroke="rgba(148, 163, 184, 0.15)" vertical={false} />
-                <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
-                <Line type="monotone" dataKey="value" stroke="#8B5CF6" strokeWidth={3} dot={{ r: 4, fill: '#5EEAD4' }} activeDot={{ r: 6, fill: '#5EEAD4' }} />
-              </LineChart>
-            </ResponsiveContainer>
+            {totalTransactionsCount === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center p-6 border border-dashed border-slate-700 rounded-2xl">
+                <BarChart3 size={32} className="text-slate-600 mb-2" />
+                <span className="font-semibold text-slate-300">Belum ada data transaksi pada periode ini</span>
+                <span className="text-[11px] text-slate-500 mt-1">Lakukan transaksi di Kasir (POS) untuk melihat grafik pendapatan</span>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData}>
+                  <CartesianGrid stroke="rgba(148, 163, 184, 0.15)" vertical={false} />
+                  <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#94A3B8', fontSize: 11 }} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fill: '#94A3B8', fontSize: 11 }} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line type="monotone" dataKey="value" stroke="#8B5CF6" strokeWidth={3} dot={{ r: 4, fill: '#38BDF8' }} activeDot={{ r: 6, fill: '#34D399' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           <div className="summary-actions">
-            <Link href="/transactions" className="btn-secondary">Lihat laporan</Link>
-            <button className="btn-primary" type="button">Ekspor data</button>
+            <Link href="/transactions" className="btn-secondary">Lihat riwayat lengkap</Link>
+            <Link href="/transactions" className="btn-primary">Ekspor Laporan (CSV)</Link>
           </div>
         </div>
 
         <div className="quick-panel">
           <div className="panel-head">
-            <h3 className="panel-title">Aksi Cepat</h3>
+            <h3 className="panel-title">Aksi Cepat &amp; Navigasi</h3>
           </div>
 
-          {quickActions.map(({ label, value, icon: Icon }) => (
-            <div key={label} className="quick-card">
+          {quickActions.map(({ label, value, icon: Icon, href }) => (
+            <Link key={label} href={href} className="quick-card hover:bg-slate-800/40 p-2 rounded-xl transition block text-inherit no-underline">
               <div className="quick-meta">
                 <span className="quick-badge"><Icon size={16} /></span>
                 <div>
-                  <div style={{ fontWeight: 700 }}>{label}</div>
+                  <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{label}</div>
                   <div className="quick-value">{value}</div>
                 </div>
               </div>
               <ArrowUpRight size={14} color="var(--text-tertiary)" />
-            </div>
+            </Link>
           ))}
         </div>
       </div>
 
+      {/* Secondary Stats Grid */}
       <div className="stats-grid">
         <div className="stat-box">
           <div className="stat-label-row">
             <span className="stat-label">Omzet Hari Ini</span>
-            <span className="metric-trend"><ArrowUpRight size={12} />{stats.todayRevenue ? 'Aktual' : '-'}</span>
+            <span className="metric-trend"><ArrowUpRight size={12} />{todayRevenue > 0 ? 'Aktual' : '0'}</span>
           </div>
-          <p className="stat-value">{formatRupiah(stats.todayRevenue)}</p>
+          <p className="stat-value">{formatRupiah(todayRevenue)}</p>
         </div>
 
         <div className="stat-box">
           <div className="stat-label-row">
             <span className="stat-label">Rata-rata Trx</span>
-            <span className="metric-trend"><ArrowUpRight size={12} />Aktual</span>
+            <span className="metric-trend"><ArrowUpRight size={12} />Per Order</span>
           </div>
-          <p className="stat-value">{formatRupiah(stats.averageTransaction)}</p>
+          <p className="stat-value">{formatRupiah(averageTransaction)}</p>
         </div>
 
         <div className="stat-box">
           <div className="stat-label-row">
-            <span className="stat-label">Kategori Terlaris</span>
-            <span className="metric-trend"><ArrowUpRight size={12} />Terlaris</span>
+            <span className="stat-label">Total Produk Aktif</span>
+            <span className="metric-trend"><ArrowUpRight size={12} />Gudang</span>
           </div>
-          <p className="stat-value">{stats.topCategory}</p>
+          <p className="stat-value">{totalProductsCount} Item</p>
         </div>
 
         <div className="stat-box">
           <div className="stat-label-row">
             <span className="stat-label">Turnover Stok</span>
-            <span className="metric-trend"><ArrowDownRight size={12} />Demo</span>
+            <span className="metric-trend"><ArrowUpRight size={12} />Rasio</span>
           </div>
-          <p className="stat-value">-</p>
+          <p className="stat-value">{stockTurnover}</p>
         </div>
       </div>
 
-      <div className="stats-grid" style={{ marginTop: 8 }}>
+      {/* Top Selling Products & Category / Payment Mix */}
+      <div className="stats-grid" style={{ marginTop: 8, gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+        {/* Top Selling Products */}
+        <div className="chart-card" style={{ padding: 18 }}>
+          <div className="panel-head" style={{ marginBottom: 12 }}>
+            <h3 className="panel-title">Produk Terlaris</h3>
+            <span className="text-[11px] text-slate-400">Berdasarkan Qty</span>
+          </div>
+          <div className="space-y-3">
+            {topSellingProducts.length === 0 ? (
+              <div className="text-center py-10 text-slate-400 text-xs">
+                Belum ada data produk terjual.
+              </div>
+            ) : (
+              topSellingProducts.map((p, idx) => (
+                <div key={p.name} className="flex items-center justify-between p-2.5 bg-slate-800/40 rounded-xl border border-slate-700/60 text-xs">
+                  <div className="flex items-center space-x-2.5 truncate">
+                    <span className="w-5 h-5 rounded-lg bg-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
+                    <span className="font-bold text-white truncate">{p.name}</span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-bold text-emerald-400">{p.qty} terjual</div>
+                    <div className="text-[10px] text-slate-400">{formatRupiah(p.revenue)}</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Payment Mix Bar Chart */}
         <div className="chart-card" style={{ padding: 18 }}>
           <div className="panel-head" style={{ marginBottom: 10 }}>
             <h3 className="panel-title">Metode Pembayaran</h3>
+            <span className="text-[11px] text-slate-400">QRIS / Tunai / Lainnya</span>
           </div>
           <div style={{ width: '100%', height: 200 }}>
             {paymentMix.length === 0 ? (
@@ -273,11 +475,13 @@ export default function Dashboard() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={paymentMix}>
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#CBD5E1', fontSize: 12 }} />
-                  <YAxis tickLine={false} axisLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#CBD5E1', fontSize: 11 }} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fill: '#94A3B8', fontSize: 11 }} />
+                  <Tooltip contentStyle={{ background: '#0F172A', border: '1px solid #334155', borderRadius: '12px', fontSize: '12px', color: '#fff' }} />
                   <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                    <LabelList dataKey="value" position="top" fill="#F8FAFC" fontSize={12} fontWeight="bold" />
                     {paymentMix.map((entry, index) => (
-                      <Cell key={entry.name} fill={index === 0 ? '#8B5CF6' : '#5EEAD4'} />
+                      <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -286,9 +490,11 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Category Mix Pie Chart */}
         <div className="chart-card" style={{ padding: 18 }}>
           <div className="panel-head" style={{ marginBottom: 10 }}>
-            <h3 className="panel-title">Kategori Produk</h3>
+            <h3 className="panel-title">Kategori Terjual</h3>
+            <span className="text-[11px] text-slate-400">Distribusi Kategori</span>
           </div>
           <div style={{ width: '100%', height: 200 }}>
             {categoryMix.length === 0 ? (
@@ -299,11 +505,13 @@ export default function Dashboard() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={categoryMix} dataKey="value" nameKey="name" innerRadius={44} outerRadius={66} paddingAngle={4}>
+                  <Tooltip contentStyle={{ background: '#0F172A', border: '1px solid #334155', borderRadius: '12px', fontSize: '12px', color: '#fff' }} />
+                  <Pie data={categoryMix} dataKey="value" nameKey="name" innerRadius={42} outerRadius={62} paddingAngle={4} label>
                     {categoryMix.map((entry, index) => (
                       <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
+                  <Legend iconSize={10} wrapperStyle={{ fontSize: '11px', color: '#CBD5E1' }} />
                 </PieChart>
               </ResponsiveContainer>
             )}

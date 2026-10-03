@@ -116,6 +116,16 @@ export default function InventoryPage() {
   const [editForm, setEditForm] = useState({ id: null, name: '', category: 'Makanan', price: '', stock: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
+  const [onlyLowStock, setOnlyLowStock] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('filter') === 'low') {
+        setOnlyLowStock(true);
+      }
+    }
+  }, []);
 
   // Custom confirmation modal state (for delete / reset)
   const [confirmModal, setConfirmModal] = useState({
@@ -325,8 +335,9 @@ export default function InventoryPage() {
   const filteredProducts = useMemo(() => products.filter((product) => {
     const matchesCategory = selectedCategory === 'Semua' || product.category === selectedCategory;
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  }), [products, searchQuery, selectedCategory]);
+    const matchesLowStock = !onlyLowStock || Number(product.stock || 0) <= 5;
+    return matchesCategory && matchesSearch && matchesLowStock;
+  }), [products, searchQuery, selectedCategory, onlyLowStock]);
 
   // Preset loading trigger
   const handleInitiateLoadPreset = (preset) => {
@@ -496,6 +507,13 @@ export default function InventoryPage() {
           </div>
         </div>
       </div>
+
+      {onlyLowStock && (
+        <div className="mb-4 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl flex items-center justify-between">
+          <span className="font-medium">Menampilkan produk dengan stok menipis/habis (≤ 5 pcs) dari peringatan dashboard.</span>
+          <button onClick={() => setOnlyLowStock(false)} className="font-bold underline px-2 py-1 bg-amber-100 hover:bg-amber-200 rounded-lg transition">Tampilkan Semua Produk</button>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
