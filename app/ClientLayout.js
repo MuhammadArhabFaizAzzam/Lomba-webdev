@@ -16,7 +16,8 @@ import {
   Menu,
   X,
   Sparkles,
-  AlertTriangle
+  AlertTriangle,
+  Bell
 } from 'lucide-react';
 import { readStoredArray, normalizeProduct } from './utils/storage';
 
@@ -242,7 +243,7 @@ export default function ClientLayout({ children }) {
       <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans relative">
         {toastMessage && (
           <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce flex items-center space-x-2">
-            <span>🔔</span>
+            <Bell size={16} className="text-amber-400" />
             <span>{toastMessage}</span>
           </div>
         )}

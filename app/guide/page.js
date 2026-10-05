@@ -10,7 +10,7 @@ export default function GuidePage() {
         <span className="bg-indigo-500/30 text-indigo-200 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
           Panduan Evaluasi Juri
         </span>
-        <h2 className="text-2xl md:text-3xl font-bold mt-2">Panduan Penggunaan & Fitur UMKM-Pro 📖</h2>
+        <h2 className="text-2xl md:text-3xl font-bold mt-2">Panduan Penggunaan &amp; Fitur UMKM-Pro</h2>
         <p className="text-slate-300 text-sm md:text-base mt-2">
           Dokumentasi singkat alur pengujian aplikasi untuk memudahkan dewan juri mengeksplorasi seluruh fitur transformasi digital UMKM.
         </p>
@@ -83,7 +83,7 @@ export default function GuidePage() {
             </div>
             <h3 className="text-lg font-bold text-slate-800 mb-2">Dashboard Bisnis</h3>
             <p className="text-slate-600 text-sm mb-4">
-              Pusat monitoring performa bisnis secara real-time. Menampilkan total pendapatan, jumlah transaksi, ringkasan produk terlaris, dan <strong className="text-slate-800">peringatan otomatis stok menipis (⚠️)</strong>.
+              Pusat monitoring performa bisnis secara real-time. Menampilkan total pendapatan, jumlah transaksi, ringkasan produk terlaris, dan <strong className="text-slate-800">peringatan otomatis stok menipis</strong>.
             </p>
           </div>
           <Link

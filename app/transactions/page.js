@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ReceiptText, Search, WalletCards, Eye, Printer, CheckCircle2, Clock, AlertCircle, Filter } from 'lucide-react';
 import { formatRupiah } from '../utils/formatCurrency';
-import { normalizeTransaction, readStoredArray, writeStoredArray } from '../utils/storage';
+import { normalizeTransaction, normalizeProduct, readStoredArray, writeStoredArray } from '../utils/storage';
 
 const formatProductName = (name) => {
   if (!name) return '';
@@ -16,6 +16,7 @@ const formatProductName = (name) => {
 };
 
 export default function TransactionsPage() {
+  const [currentUser, setCurrentUser] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('Semua');
@@ -25,6 +26,11 @@ export default function TransactionsPage() {
   // Detail Modal State
   const [selectedTx, setSelectedTx] = useState(null);
   const [showModal, setShowModal] = useState(false);
+
+  // Custom Confirm Modal State for Mark As Paid
+  const [showConfirmMarkPaidModal, setShowConfirmMarkPaidModal] = useState(false);
+  const [txToMarkPaid, setTxToMarkPaid] = useState(null);
+
   const [toastMessage, setToastMessage] = useState('');
 
   const showToast = (msg) => {
@@ -33,32 +39,74 @@ export default function TransactionsPage() {
   };
 
   useEffect(() => {
+    const authUser = localStorage.getItem('zenith_auth_user');
+    if (authUser) {
+      try {
+        setCurrentUser(JSON.parse(authUser));
+      } catch {
+        setCurrentUser(null);
+      }
+    }
+
     const loadTransactions = window.setTimeout(() => {
       const parsed = readStoredArray('transactions').map(normalizeTransaction);
-      // Ensure each transaction has a status ('Lunas' by default if not set)
       const enhanced = parsed.map(tx => ({
         ...tx,
         status: tx.status || (tx.payment?.includes('QRIS') ? 'Menunggu' : 'Lunas'),
         cashier: tx.cashier || 'Kasir Staff',
+        paidAt: tx.paidAt || (tx.status === 'Lunas' ? tx.date : null),
       }));
       setTransactions(enhanced);
     }, 0);
     return () => window.clearTimeout(loadTransactions);
   }, []);
 
+  const isAdmin = currentUser?.role === 'management';
+
   const saveTransactions = (nextTxs) => {
     setTransactions(nextTxs);
     writeStoredArray('transactions', nextTxs);
   };
 
-  const handleMarkAsPaid = (txId, e) => {
-    e.stopPropagation();
-    const updated = transactions.map(tx => tx.id === txId ? { ...tx, status: 'Lunas' } : tx);
-    saveTransactions(updated);
-    showToast(`Transaksi ${txId} berhasil ditandai Lunas!`);
-    if (selectedTx && selectedTx.id === txId) {
-      setSelectedTx(prev => ({ ...prev, status: 'Lunas' }));
+  const promptMarkAsPaid = (tx, e) => {
+    if (e) e.stopPropagation();
+    setTxToMarkPaid(tx);
+    setShowConfirmMarkPaidModal(true);
+  };
+
+  const executeMarkAsPaid = () => {
+    if (!txToMarkPaid) return;
+    const tx = txToMarkPaid;
+
+    // Deduct stock from products
+    const products = readStoredArray('products').map(normalizeProduct);
+    const hasInsufficientStock = tx.items.some(item => {
+      const prod = products.find(p => p.id === item.id || p.name === item.name);
+      return !prod || prod.stock < item.qty;
+    });
+
+    if (hasInsufficientStock) {
+      showToast('Peringatan: Stok produk di gudang tidak mencukupi untuk pemotongan otomatis!');
     }
+
+    const updatedProducts = products.map(prod => {
+      const cartItem = tx.items.find(i => i.id === prod.id || i.name === prod.name);
+      if (!cartItem) return prod;
+      return { ...prod, stock: Math.max(0, Number(prod.stock || 0) - cartItem.qty) };
+    });
+    writeStoredArray('products', updatedProducts);
+
+    const paidTimestamp = new Date().toLocaleString('id-ID');
+    const updatedTransactions = transactions.map(t => t.id === tx.id ? { ...t, status: 'Lunas', paidAt: paidTimestamp } : t);
+    saveTransactions(updatedTransactions);
+
+    showToast(`Transaksi ${tx.id} Lunas & Stok gudang berhasil dipotong!`);
+    if (selectedTx && selectedTx.id === tx.id) {
+      setSelectedTx(prev => ({ ...prev, status: 'Lunas', paidAt: paidTimestamp }));
+    }
+
+    setShowConfirmMarkPaidModal(false);
+    setTxToMarkPaid(null);
   };
 
   const filteredTransactions = useMemo(() => {
@@ -81,20 +129,25 @@ export default function TransactionsPage() {
     });
   }, [transactions, searchTerm, methodFilter, statusFilter, dateFilter]);
 
-  // Summary Metrics
+  // Financial & Summary Metrics
   const summary = useMemo(() => {
     const todayStr = new Date().toDateString();
     const totalCount = filteredTransactions.length;
-    const todayRevenue = filteredTransactions
+    
+    const totalRecorded = filteredTransactions.reduce((sum, tx) => sum + Number(tx.total || 0), 0);
+    const totalPaid = filteredTransactions.filter(tx => tx.status === 'Lunas').reduce((sum, tx) => sum + Number(tx.total || 0), 0);
+    const totalPending = filteredTransactions.filter(tx => tx.status === 'Menunggu').reduce((sum, tx) => sum + Number(tx.total || 0), 0);
+
+    const todayPaidRevenue = filteredTransactions
       .filter(tx => new Date(tx.createdAt || tx.date).toDateString() === todayStr && tx.status === 'Lunas')
       .reduce((sum, tx) => sum + Number(tx.total || 0), 0);
-    const qrisCount = filteredTransactions.filter(tx => String(tx.payment || '').includes('QRIS')).length;
-    const pendingCount = filteredTransactions.filter(tx => tx.status === 'Menunggu').length;
-    const totalRevenue = filteredTransactions
-      .filter(tx => tx.status === 'Lunas')
-      .reduce((sum, tx) => sum + Number(tx.total || 0), 0);
 
-    return { totalCount, todayRevenue, qrisCount, pendingCount, totalRevenue };
+    const qrisList = filteredTransactions.filter(tx => String(tx.payment || '').includes('QRIS'));
+    const qrisPaidCount = qrisList.filter(tx => tx.status === 'Lunas').length;
+    const qrisPendingCount = qrisList.filter(tx => tx.status === 'Menunggu').length;
+    const pendingCount = filteredTransactions.filter(tx => tx.status === 'Menunggu').length;
+
+    return { totalCount, totalRecorded, totalPaid, totalPending, todayPaidRevenue, qrisPaidCount, qrisPendingCount, qrisTotal: qrisList.length, pendingCount };
   }, [filteredTransactions]);
 
   const exportToCSV = () => {
@@ -186,37 +239,49 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Summary Cards Above Table */}
+      {/* Summary Cards Above Table (Clickable as filters) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total Transaksi</span>
+        <div
+          onClick={() => { setStatusFilter('Semua'); setMethodFilter('Semua'); }}
+          className="bg-slate-900/80 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
+        >
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block group-hover:text-indigo-400 transition">Total Tercatat</span>
           <div className="flex items-baseline justify-between mt-1">
-            <span className="text-2xl font-extrabold text-white">{summary.totalCount}</span>
-            <span className="text-xs text-indigo-400 font-semibold">{formatRupiah(summary.totalRevenue)}</span>
+            <span className="text-2xl font-extrabold text-white">{formatRupiah(summary.totalRecorded)}</span>
+            <span className="text-xs text-slate-400 font-semibold">{summary.totalCount} Trx</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Masuk Hari Ini</span>
+        <div
+          onClick={() => setStatusFilter('Lunas')}
+          className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
+        >
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block group-hover:text-emerald-400 transition">Sudah Lunas (Masuk)</span>
           <div className="flex items-baseline justify-between mt-1">
-            <span className="text-2xl font-extrabold text-emerald-400">{formatRupiah(summary.todayRevenue)}</span>
-            <span className="text-xs text-slate-400 font-semibold">Aktual</span>
+            <span className="text-2xl font-extrabold text-emerald-400">{formatRupiah(summary.totalPaid)}</span>
+            <span className="text-xs text-slate-400 font-semibold">Hari Ini: {formatRupiah(summary.todayPaidRevenue)}</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total QRIS</span>
+        <div
+          onClick={() => setMethodFilter('QRIS')}
+          className="bg-slate-900/80 border border-slate-800 hover:border-sky-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
+        >
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block group-hover:text-sky-400 transition">Total QRIS</span>
           <div className="flex items-baseline justify-between mt-1">
-            <span className="text-2xl font-extrabold text-sky-400">{summary.qrisCount} Trx</span>
-            <span className="text-xs text-slate-400 font-semibold">Digital</span>
+            <span className="text-xl font-extrabold text-sky-400">{summary.qrisPaidCount} Lunas, {summary.qrisPendingCount} Menunggu</span>
+            <span className="text-xs text-slate-400 font-semibold">{summary.qrisTotal} Total</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Menunggu Bayar</span>
+        <div
+          onClick={() => setStatusFilter('Menunggu')}
+          className="bg-slate-900/80 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
+        >
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block group-hover:text-amber-400 transition">Masih Menunggu (Pending)</span>
           <div className="flex items-baseline justify-between mt-1">
-            <span className="text-2xl font-extrabold text-amber-400">{summary.pendingCount}</span>
-            <span className="text-xs text-amber-300 font-semibold">{summary.pendingCount > 0 ? 'Perlu Cek' : 'Aman'}</span>
+            <span className="text-2xl font-extrabold text-amber-400">{formatRupiah(summary.totalPending)}</span>
+            <span className="text-xs text-amber-300 font-semibold">{summary.pendingCount} Trx</span>
           </div>
         </div>
       </div>
@@ -240,7 +305,7 @@ export default function TransactionsPage() {
           <select
             value={methodFilter}
             onChange={(e) => setMethodFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl focus:outline-none focus:border-indigo-500"
+            className="px-3 py-2 bg-slate-800 border border-slate-700 text-white text-xs font-semibold rounded-xl focus:outline-none focus:border-indigo-500"
           >
             <option value="Semua">Semua Metode</option>
             <option value="QRIS">QRIS</option>
@@ -253,7 +318,7 @@ export default function TransactionsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl focus:outline-none focus:border-indigo-500"
+            className="px-3 py-2 bg-slate-800 border border-slate-700 text-white text-xs font-semibold rounded-xl focus:outline-none focus:border-indigo-500"
           >
             <option value="Semua">Semua Status</option>
             <option value="Lunas">Lunas</option>
@@ -265,7 +330,7 @@ export default function TransactionsPage() {
           <select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl focus:outline-none focus:border-indigo-500"
+            className="px-3 py-2 bg-slate-800 border border-slate-700 text-white text-xs font-semibold rounded-xl focus:outline-none focus:border-indigo-500"
           >
             <option value="Semua">Semua Waktu</option>
             <option value="Hari Ini">Hari Ini</option>
@@ -332,14 +397,14 @@ export default function TransactionsPage() {
                         >
                           <Eye size={15} />
                         </button>
-                        {tx.status === 'Menunggu' && (
+                        {isAdmin && tx.status === 'Menunggu' && (
                           <button
                             type="button"
-                            onClick={(e) => handleMarkAsPaid(tx.id, e)}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition"
+                            onClick={(e) => promptMarkAsPaid(tx, e)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition shadow-sm"
                             title="Tandai Lunas"
                           >
-                            Lunas?
+                            Tandai Lunas
                           </button>
                         )}
                       </div>
@@ -358,7 +423,7 @@ export default function TransactionsPage() {
           <div className="modal-card max-w-lg w-full p-6 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl text-slate-100">
             <div className="flex justify-between items-start pb-4 border-b border-slate-800 mb-4">
               <div>
-                <span className="eyebrow" style={{ color: 'var(--accent-secondary)' }}>Detail Transaksi</span>
+                <span className="eyebrow" style={{ color: 'var(--accent-secondary)' }}>Detail Transaksi &amp; Pembayaran</span>
                 <h3 className="text-xl font-extrabold text-white font-mono mt-1">{selectedTx.id}</h3>
               </div>
               <button
@@ -373,8 +438,12 @@ export default function TransactionsPage() {
             <div className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3 p-3 bg-slate-800/60 rounded-xl border border-slate-700/60">
                 <div>
-                  <span className="text-slate-400 block">Waktu Transaksi</span>
+                  <span className="text-slate-400 block">Waktu Dibuat</span>
                   <strong className="text-white text-sm">{selectedTx.date}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-400 block">Waktu Lunas</span>
+                  <strong className="text-emerald-400 text-sm">{selectedTx.paidAt || (selectedTx.status === 'Lunas' ? selectedTx.date : 'Belum Lunas')}</strong>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Kasir Bertugas</span>
@@ -384,7 +453,7 @@ export default function TransactionsPage() {
                   <span className="text-slate-400 block">Metode Pembayaran</span>
                   <strong className="text-white text-sm">{selectedTx.payment}</strong>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <span className="text-slate-400 block">Status Pembayaran</span>
                   <div className="mt-1">{getStatusBadge(selectedTx.status)}</div>
                 </div>
@@ -397,7 +466,7 @@ export default function TransactionsPage() {
                     <div key={idx} className="flex justify-between items-center p-2.5 bg-slate-800/40 rounded-xl border border-slate-700/50">
                       <div>
                         <div className="font-bold text-white">{formatProductName(item.name)}</div>
-                        <div className="text-slate-400 text-[11px]">{formatRupiah(item.price)} × {item.qty}</div>
+                        <div className="text-slate-400 text-[11px]">{formatRupiah(item.price)} × {item.qty} unit</div>
                       </div>
                       <div className="font-bold text-indigo-400 font-mono">
                         {formatRupiah(item.price * item.qty)}
@@ -414,10 +483,10 @@ export default function TransactionsPage() {
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
-              {selectedTx.status === 'Menunggu' && (
+              {isAdmin && selectedTx.status === 'Menunggu' && (
                 <button
                   type="button"
-                  onClick={(e) => handleMarkAsPaid(selectedTx.id, e)}
+                  onClick={(e) => { setShowModal(false); promptMarkAsPaid(selectedTx, e); }}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-md"
                 >
                   Tandai Pembayaran Lunas
@@ -437,6 +506,37 @@ export default function TransactionsPage() {
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition"
               >
                 Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal for Mark As Paid */}
+      {showConfirmMarkPaidModal && txToMarkPaid && (
+        <div className="modal-backdrop">
+          <div className="modal-card max-w-sm w-full p-6 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl text-slate-100 text-center animate-fadeIn">
+            <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-4 font-bold text-xl">
+              <CheckCircle2 size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Konfirmasi Pembayaran Lunas</h3>
+            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+              Tandai transaksi <strong className="text-indigo-400 font-mono">{txToMarkPaid.id}</strong> sebesar <strong className="text-emerald-400">{formatRupiah(txToMarkPaid.total)}</strong> sebagai Lunas? Stok gudang akan otomatis dipotong dan omzet dicatatkan.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => { setShowConfirmMarkPaidModal(false); setTxToMarkPaid(null); }}
+                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={executeMarkAsPaid}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition"
+              >
+                Ya, Tandai Lunas
               </button>
             </div>
           </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Key } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -112,7 +113,10 @@ export default function LoginPage() {
           </div>
 
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-600 space-y-1.5">
-            <p className="font-bold text-slate-900">📌 Demo Credentials:</p>
+            <p className="font-bold text-slate-900 flex items-center space-x-1.5">
+              <Key size={14} className="text-indigo-600" />
+              <span>Demo Credentials:</span>
+            </p>
             <div className="flex justify-between items-center bg-white p-2 rounded border border-slate-200">
               <span className="font-medium text-slate-700">Kasir:</span>
               <code className="font-mono text-indigo-600 font-bold">kasir / kasir123</code>

@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { PackagePlus, Plus, Search, Trash2 } from 'lucide-react';
+import { PackagePlus, Plus, Search, Trash2, ArrowUpDown, Download, RefreshCw, Info, AlertTriangle } from 'lucide-react';
 import { formatRupiah } from '../utils/formatCurrency';
 import { normalizeProduct, readStoredArray, removeStoredArray, writeStoredArray } from '../utils/storage';
 
@@ -104,6 +104,11 @@ export default function InventoryPage() {
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [showSavePresetModal, setShowSavePresetModal] = useState(false);
   const [showLoadConfirmModal, setShowLoadConfirmModal] = useState(false);
+  
+  // Quick Restock Modal State
+  const [showRestockModal, setShowRestockModal] = useState(false);
+  const [restockProduct, setRestockProduct] = useState(null);
+  const [restockAmount, setRestockAmount] = useState('10');
 
   // Selected preset to load
   const [selectedPresetToLoad, setSelectedPresetToLoad] = useState(null);
@@ -116,6 +121,7 @@ export default function InventoryPage() {
   const [editForm, setEditForm] = useState({ id: null, name: '', category: 'Makanan', price: '', stock: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
+  const [stockStatusFilter, setStockStatusFilter] = useState('Semua'); // 'Semua' | 'Normal' | 'Menipis' | 'Habis'
   const [onlyLowStock, setOnlyLowStock] = useState(false);
 
   useEffect(() => {
@@ -123,6 +129,7 @@ export default function InventoryPage() {
       const params = new URLSearchParams(window.location.search);
       if (params.get('filter') === 'low') {
         setOnlyLowStock(true);
+        setStockStatusFilter('Menipis');
       }
     }
   }, []);
@@ -143,7 +150,6 @@ export default function InventoryPage() {
   };
 
   useEffect(() => {
-    // Load products and normalize/deduplicate IDs if any duplicates or missing IDs exist
     const parsed = readStoredArray('products');
     if (parsed.length > 0) {
       try {
@@ -168,7 +174,6 @@ export default function InventoryPage() {
       setProducts([]);
     }
 
-    // Load custom presets
     const savedPresets = localStorage.getItem('zenith_presets');
     if (savedPresets) {
       try {
@@ -284,6 +289,29 @@ export default function InventoryPage() {
     saveProductsToStorage(updated);
   };
 
+  const handleQuickRestockSubmit = (e) => {
+    e.preventDefault();
+    if (!restockProduct) return;
+    const qty = Number(restockAmount);
+    if (isNaN(qty) || qty <= 0) {
+      showToast('Masukkan jumlah restock yang valid!');
+      return;
+    }
+
+    const updated = products.map((p) => {
+      if (p.id === restockProduct.id) {
+        return { ...p, stock: p.stock + qty };
+      }
+      return p;
+    });
+
+    saveProductsToStorage(updated);
+    setShowRestockModal(false);
+    setRestockProduct(null);
+    setRestockAmount('10');
+    showToast(`Stok ${restockProduct.name} berhasil ditambah +${qty} pcs!`);
+  };
+
   const promptDelete = (id) => {
     setConfirmModal({
       isOpen: true,
@@ -297,8 +325,8 @@ export default function InventoryPage() {
   const promptReset = () => {
     setConfirmModal({
       isOpen: true,
-      title: 'Konfirmasi Reset Data (0)',
-      message: 'Yakin ingin mereset seluruh data produk dan transaksi ke kondisi awal (0)? Semua data akan dikosongkan.',
+      title: 'Reset Seluruh Data Produk',
+      message: 'PERINGATAN: Tindakan ini akan menghapus SEMUA produk dari inventaris. Lanjutkan?',
       actionType: 'reset',
       targetId: null,
     });
@@ -308,7 +336,7 @@ export default function InventoryPage() {
     setConfirmModal({
       isOpen: true,
       title: 'Hapus Custom Preset',
-      message: 'Apakah Anda yakin ingin menghapus preset custom ini?',
+      message: 'Hapus preset simpanan ini?',
       actionType: 'delete_custom_preset',
       targetId: id,
     });
@@ -332,14 +360,46 @@ export default function InventoryPage() {
     setConfirmModal({ isOpen: false, title: '', message: '', actionType: null, targetId: null });
   };
 
-  const filteredProducts = useMemo(() => products.filter((product) => {
-    const matchesCategory = selectedCategory === 'Semua' || product.category === selectedCategory;
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesLowStock = !onlyLowStock || Number(product.stock || 0) <= 5;
-    return matchesCategory && matchesSearch && matchesLowStock;
-  }), [products, searchQuery, selectedCategory, onlyLowStock]);
+  // Export Inventory CSV
+  const exportInventoryCSV = () => {
+    if (products.length === 0) return;
+    const headers = ['ID', 'Nama Produk', 'Kategori', 'Harga Satuan (Rp)', 'Stok'];
+    const rows = products.map(p => [
+      `"${p.id}"`,
+      `"${String(p.name).replace(/"/g, '""')}"`,
+      `"${String(p.category).replace(/"/g, '""')}"`,
+      `"${p.price}"`,
+      `"${p.stock}"`
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `laporan-inventaris-zenith-pos-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
-  // Preset loading trigger
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      const matchesCategory = selectedCategory === 'Semua' || product.category === selectedCategory;
+      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      let matchesStockStatus = true;
+      const st = Number(product.stock || 0);
+      if (stockStatusFilter === 'Normal') matchesStockStatus = st > 20;
+      if (stockStatusFilter === 'Menipis') matchesStockStatus = st > 0 && st <= 20;
+      if (stockStatusFilter === 'Habis') matchesStockStatus = st === 0;
+
+      const matchesLowStockParam = !onlyLowStock || st <= 5;
+
+      return matchesCategory && matchesSearch && matchesStockStatus && matchesLowStockParam;
+    });
+  }, [products, searchQuery, selectedCategory, stockStatusFilter, onlyLowStock]);
+
   const handleInitiateLoadPreset = (preset) => {
     setSelectedPresetToLoad(preset);
     setLoadMode('add');
@@ -347,49 +407,42 @@ export default function InventoryPage() {
     setShowLoadConfirmModal(true);
   };
 
-  // Execute loading preset with Add or Replace mode
   const handleExecuteLoadPreset = () => {
     if (!selectedPresetToLoad || !selectedPresetToLoad.products) return;
 
     const preparedProducts = selectedPresetToLoad.products.map((p, idx) => ({
       id: Date.now() + idx + Math.floor(Math.random() * 1000),
       name: p.name,
-      category: p.category || 'Lainnya',
-      price: Number(p.price),
-      stock: Number(p.stock),
+      category: p.category || 'Makanan',
+      price: Number(p.price || 0),
+      stock: Number(p.stock || 0),
     }));
 
-    let finalProducts = [];
+    let nextProducts = [];
     if (loadMode === 'replace') {
-      finalProducts = preparedProducts;
+      nextProducts = preparedProducts;
     } else {
-      const existingNames = new Set(products.map((p) => p.name.toLowerCase().trim()));
-      const uniqueNewProducts = preparedProducts.filter(
-        (p) => !existingNames.has(p.name.toLowerCase().trim())
-      );
-      finalProducts = [...uniqueNewProducts, ...products];
+      const existingNames = new Set(products.map((p) => p.name.toLowerCase()));
+      const filteredNew = preparedProducts.filter((p) => !existingNames.has(p.name.toLowerCase()));
+      nextProducts = [...filteredNew, ...products];
     }
 
-    saveProductsToStorage(finalProducts);
+    saveProductsToStorage(nextProducts);
     setShowLoadConfirmModal(false);
-    showToast(`✓ ${selectedPresetToLoad.name} berhasil dimuat — ${preparedProducts.length} produk.`);
     setSelectedPresetToLoad(null);
+    showToast(`Preset "${selectedPresetToLoad.name}" berhasil dimuat!`);
   };
 
-  // Save current inventory as a custom preset
   const handleSaveCustomPreset = (e) => {
     e.preventDefault();
-    if (!savePresetForm.name.trim()) {
-      showToast('Nama preset wajib diisi!');
-      return;
-    }
+    if (!savePresetForm.name.trim()) return;
     if (products.length === 0) {
-      showToast('Inventaris Anda kosong. Tambahkan beberapa produk terlebih dahulu.');
+      showToast('Tidak ada produk untuk disimpan sebagai preset.');
       return;
     }
 
     const newCustomPreset = {
-      id: 'custom-' + Date.now(),
+      id: `custom-${Date.now()}`,
       name: savePresetForm.name.trim(),
       description: savePresetForm.description.trim() || 'Custom user preset',
       products: products.map((p) => ({
@@ -400,8 +453,8 @@ export default function InventoryPage() {
       })),
     };
 
-    const updatedPresets = [newCustomPreset, ...customPresets];
-    saveCustomPresetsToStorage(updatedPresets);
+    const updated = [newCustomPreset, ...customPresets];
+    saveCustomPresetsToStorage(updated);
     setSavePresetForm({ name: '', description: '' });
     setShowSavePresetModal(false);
     showToast(`Preset "${newCustomPreset.name}" berhasil disimpan!`);
@@ -436,7 +489,7 @@ export default function InventoryPage() {
     <div className="space-y-6 animate-fadeIn relative">
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 text-xs font-bold animate-bounce">
-          <span className="text-indigo-400">ℹ️</span>
+          <Info size={16} className="text-indigo-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -444,9 +497,16 @@ export default function InventoryPage() {
       <div className="inventory-header">
         <div>
           <p className="eyebrow">Management Hub</p>
-          <h2 className="page-title">Manajemen Stok Produk</h2>
+          <h2 className="page-title">Manajemen Stok &amp; Inventaris</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={exportInventoryCSV}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-600/20 transition flex items-center space-x-2"
+          >
+            <Download size={15} />
+            <span>Export CSV</span>
+          </button>
           <button
             onClick={() => setShowPresetModal(true)}
             className="bg-sky-600 hover:bg-sky-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-sky-600/20 transition flex items-center space-x-2"
@@ -454,7 +514,7 @@ export default function InventoryPage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <span>📦 Preset Data</span>
+            <span>Preset Data</span>
           </button>
           <button
             onClick={promptReset}
@@ -511,10 +571,11 @@ export default function InventoryPage() {
       {onlyLowStock && (
         <div className="mb-4 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl flex items-center justify-between">
           <span className="font-medium">Menampilkan produk dengan stok menipis/habis (≤ 5 pcs) dari peringatan dashboard.</span>
-          <button onClick={() => setOnlyLowStock(false)} className="font-bold underline px-2 py-1 bg-amber-100 hover:bg-amber-200 rounded-lg transition">Tampilkan Semua Produk</button>
+          <button onClick={() => { setOnlyLowStock(false); setStockStatusFilter('Semua'); }} className="font-bold underline px-2 py-1 bg-amber-100 hover:bg-amber-200 rounded-lg transition">Tampilkan Semua Produk</button>
         </div>
       )}
 
+      {/* Filter Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -524,10 +585,23 @@ export default function InventoryPage() {
             type="text"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Cari produk di inventaris..."
+            placeholder="Cari produk berdasarkan nama..."
             className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 transition"
           />
         </div>
+
+        {/* Stock Status Filter */}
+        <select
+          value={stockStatusFilter}
+          onChange={(e) => setStockStatusFilter(e.target.value)}
+          className="px-4 py-2.5 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:border-indigo-600 transition"
+        >
+          <option value="Semua">Semua Status Stok</option>
+          <option value="Normal">Stok Normal (&gt;20)</option>
+          <option value="Menipis">Stok Menipis (1-20)</option>
+          <option value="Habis">Stok Habis (0)</option>
+        </select>
+
         <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
           {categories.map((category) => (
             <button
@@ -596,6 +670,13 @@ export default function InventoryPage() {
                         >
                           +
                         </button>
+                        <button
+                          onClick={() => { setRestockProduct(p); setRestockAmount('10'); setShowRestockModal(true); }}
+                          className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded shadow-2xs transition ml-1"
+                          title="Restock Massal"
+                        >
+                          Restock +
+                        </button>
                       </div>
                     </td>
                     <td className="py-4 px-6 text-right space-x-2">
@@ -620,108 +701,48 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Modal: Preset Data Explorer */}
+      {/* Preset Modal */}
       {showPresetModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 md:p-8 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6 pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-lg">
-                  📦
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">Preset Data & Starter Inventory</h3>
-                  <p className="text-xs text-slate-500">Pilih dari preset retail Indonesia atau buat preset kustom Anda.</p>
-                </div>
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Preset Data Retail Instan</h3>
+                <p className="text-xs text-slate-500">Pilih dari templat standar industri retail Indonesia untuk langsung mengisi inventaris.</p>
               </div>
               <button onClick={() => setShowPresetModal(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
             </div>
 
-            <div className="space-y-6">
-              {/* Built-in Presets Section */}
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Built-in Retail Presets</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {BUILT_IN_PRESETS.map((preset) => (
-                    <div key={preset.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:border-sky-300 transition flex flex-col justify-between">
-                      <div>
-                        <div className="flex justify-between items-start mb-1">
-                          <h5 className="font-bold text-slate-800 text-sm">{preset.name}</h5>
-                          <span className="px-2 py-0.5 bg-sky-100 text-sky-700 rounded text-[10px] font-semibold">
-                            {preset.products.length} produk
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 mb-4 leading-relaxed">{preset.description}</p>
-                      </div>
-                      <button
-                        onClick={() => handleInitiateLoadPreset(preset)}
-                        className="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold shadow-xs transition"
-                      >
-                        Muat Preset &rarr;
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom Presets Section */}
-              <div className="pt-4 border-t border-slate-200">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">My Custom Presets</h4>
-                  <button
-                    onClick={() => {
-                      setShowPresetModal(false);
-                      setShowSavePresetModal(true);
-                    }}
-                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition"
-                  >
-                    + Simpan Inventaris Saat Ini sebagai Preset
-                  </button>
-                </div>
-
-                {customPresets.length === 0 ? (
-                  <div className="p-6 text-center border border-dashed border-slate-200 rounded-xl text-slate-400 text-xs">
-                    Belum ada custom preset yang disimpan.
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-1">
+              {BUILT_IN_PRESETS.map((preset) => (
+                <div key={preset.id} className="p-4 rounded-xl border border-slate-200 hover:border-indigo-600 bg-slate-50/50 flex flex-col justify-between transition group">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition">{preset.name}</h4>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">{preset.description}</p>
+                    <span className="inline-block mt-3 px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 font-semibold text-[11px]">
+                      {preset.products.length} Produk siap muat
+                    </span>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {customPresets.map((preset) => (
-                      <div key={preset.id} className="p-4 rounded-xl border border-slate-200 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h5 className="font-bold text-slate-800 text-sm">{preset.name}</h5>
-                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-semibold">
-                              {preset.products.length} produk
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-500">{preset.description}</p>
-                        </div>
-                        <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
-                          <button
-                            onClick={() => handleInitiateLoadPreset(preset)}
-                            className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold transition"
-                          >
-                            Muat
-                          </button>
-                          <button
-                            onClick={() => promptDeleteCustomPreset(preset.id)}
-                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold transition"
-                          >
-                            Hapus
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-end">
+                    <button
+                      onClick={() => handleInitiateLoadPreset(preset)}
+                      className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition shadow-xs"
+                    >
+                      Gunakan Preset &rarr;
+                    </button>
                   </div>
-                )}
-              </div>
+                </div>
+              ))}
             </div>
 
-            <div className="mt-8 pt-4 border-t border-slate-100 flex justify-end">
+            <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center">
               <button
-                onClick={() => setShowPresetModal(false)}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                onClick={() => setShowSavePresetModal(true)}
+                className="text-xs font-bold text-indigo-600 hover:underline"
               >
+                + Simpan Stok Saat Ini sebagai Preset Baru
+              </button>
+              <button onClick={() => setShowPresetModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">
                 Tutup
               </button>
             </div>
@@ -729,74 +750,79 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Modal: Load Preset Confirmation (Add vs Replace) */}
+      {/* Load Confirm Modal */}
       {showLoadConfirmModal && selectedPresetToLoad && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 md:p-8 shadow-2xl border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Muat Preset: {selectedPresetToLoad.name}</h3>
-            <p className="text-xs text-slate-500 mb-6">Bagaimana Anda ingin menambahkan produk preset ini ke inventaris?</p>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Muat Preset: {selectedPresetToLoad.name}</h3>
+            <p className="text-xs text-slate-600 mb-5 leading-relaxed">
+              Bagaimana Anda ingin memasukkan produk dari preset ini ke dalam inventaris?
+            </p>
 
             <div className="space-y-3 mb-6">
-              <label className={`flex items-start p-3.5 rounded-xl border cursor-pointer transition ${loadMode === 'add' ? 'border-sky-600 bg-sky-50/50' : 'border-slate-200 bg-white'}`}>
-                <input
-                  type="radio"
-                  name="loadMode"
-                  value="add"
-                  checked={loadMode === 'add'}
-                  onChange={() => setLoadMode('add')}
-                  className="mt-0.5 text-sky-600 focus:ring-sky-500"
-                />
-                <div className="ml-3">
-                  <span className="block text-xs font-bold text-slate-900">Tambahkan ke inventaris saat ini (Aman)</span>
-                  <span className="block text-[11px] text-slate-500 mt-0.5">Mempertahankan produk lama dan menambahkan produk baru dari preset (duplikat nama dicegah).</span>
+              <label className={`flex items-start p-3.5 rounded-xl border cursor-pointer transition ${loadMode === 'add' ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-200'}`}>
+                <input type="radio" name="loadMode" checked={loadMode === 'add'} onChange={() => setLoadMode('add')} className="mt-0.5 mr-3 accent-indigo-600" />
+                <div>
+                  <strong className="text-xs text-slate-800 block">Gabungkan (Rekomendasi)</strong>
+                  <span className="text-[11px] text-slate-500">Tambahkan produk baru dan pertahankan produk yang sudah ada.</span>
                 </div>
               </label>
 
-              <label className={`flex items-start p-3.5 rounded-xl border cursor-pointer transition ${loadMode === 'replace' ? 'border-rose-600 bg-rose-50/50' : 'border-slate-200 bg-white'}`}>
-                <input
-                  type="radio"
-                  name="loadMode"
-                  value="replace"
-                  checked={loadMode === 'replace'}
-                  onChange={() => setLoadMode('replace')}
-                  className="mt-0.5 text-rose-600 focus:ring-rose-500"
-                />
-                <div className="ml-3">
-                  <span className="block text-xs font-bold text-slate-900">Ganti seluruh inventaris</span>
-                  <span className="block text-[11px] text-slate-500 mt-0.5">Menghapus seluruh produk lama dan menggantinya dengan isi preset ini.</span>
+              <label className={`flex items-start p-3.5 rounded-xl border cursor-pointer transition ${loadMode === 'replace' ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-200'}`}>
+                <input type="radio" name="loadMode" checked={loadMode === 'replace'} onChange={() => setLoadMode('replace')} className="mt-0.5 mr-3 accent-indigo-600" />
+                <div>
+                  <strong className="text-xs text-slate-800 block">Timpa Seluruhnya (Ganti Total)</strong>
+                  <span className="text-[11px] text-slate-500">Hapus inventaris saat ini dan ganti dengan isi preset ini.</span>
                 </div>
               </label>
             </div>
 
             <div className="flex space-x-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowLoadConfirmModal(false);
-                  setSelectedPresetToLoad(null);
-                }}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleExecuteLoadPreset}
-                className="flex-1 py-2.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl shadow-md shadow-sky-600/30 transition"
-              >
-                Muat Preset Sekarang
-              </button>
+              <button onClick={() => setShowLoadConfirmModal(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">Batal</button>
+              <button onClick={handleExecuteLoadPreset} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition">Muat Sekarang</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal: Save Current Inventory as Custom Preset */}
+      {/* Quick Restock Modal */}
+      {showRestockModal && restockProduct && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
+            <h3 className="text-base font-bold text-slate-900 mb-1">Restock Produk</h3>
+            <p className="text-xs text-slate-500 mb-4">Tambah stok untuk <strong className="text-indigo-600">{restockProduct.name}</strong> (Stok saat ini: {restockProduct.stock} pcs)</p>
+            
+            <form onSubmit={handleQuickRestockSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Jumlah Tambahan (Pcs)</label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={restockAmount}
+                  onChange={(e) => setRestockAmount(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-bold"
+                  autoFocus
+                />
+              </div>
+
+              <div className="pt-2 flex space-x-3">
+                <button type="button" onClick={() => setShowRestockModal(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">Batal</button>
+                <button type="submit" className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition">Tambah Stok</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Save Custom Preset Modal */}
       {showSavePresetModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 md:p-8 shadow-2xl border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Simpan Custom Preset</h3>
-            <p className="text-xs text-slate-500 mb-6">Simpan {products.length} produk di inventaris saat ini sebagai preset kustom.</p>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800">Simpan Preset Baru</h3>
+              <button onClick={() => setShowSavePresetModal(false)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+            </div>
 
             <form onSubmit={handleSaveCustomPreset} className="space-y-4">
               <div>
@@ -864,8 +890,9 @@ export default function InventoryPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Harga Satuan (Rp)</label>
-                <input type="text" required value={form.price} onChange={(e) => setForm({ ...form, price: formatNumberInput(e.target.value) })} onBlur={(e) => handlePriceBlur(e.target.value, 'add', 'price')} placeholder="Contoh: 15" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-medium" />
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Harga Jual Satuan (Rp)</label>
+                <input type="text" required value={form.price} onChange={(e) => setForm({ ...form, price: formatNumberInput(e.target.value) })} onBlur={(e) => handlePriceBlur(e.target.value, 'add', 'price')} placeholder="Contoh: 15.000" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-medium" />
+                <span className="text-[10px] text-slate-400 mt-1 block">*Estimasi margin keuntungan kotor ~30% dihitung otomatis.</span>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Jumlah Stok Awal</label>
@@ -902,7 +929,7 @@ export default function InventoryPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Harga Satuan (Rp)</label>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Harga Jual Satuan (Rp)</label>
                 <input type="text" required value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: formatNumberInput(e.target.value) }) } onBlur={(e) => handlePriceBlur(e.target.value, 'edit', 'price')} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-medium" />
               </div>
               <div>
@@ -921,7 +948,9 @@ export default function InventoryPage() {
       {confirmModal.isOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-center">
-            <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4 font-bold text-xl">⚠️</div>
+            <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={24} className="text-rose-600" />
+            </div>
             <h3 className="text-lg font-bold text-slate-900 mb-2">{confirmModal.title}</h3>
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">{confirmModal.message}</p>
             <div className="flex space-x-3">

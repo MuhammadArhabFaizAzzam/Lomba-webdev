@@ -15,6 +15,7 @@ import {
   Clock,
   ShieldCheck,
   Tag,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -235,7 +236,7 @@ export default function Dashboard() {
       {lowStockCount > 0 && (
         <Link href="/inventory?filter=low" className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 flex items-center justify-between shadow-lg hover:bg-amber-500/15 transition group">
           <div className="flex items-center space-x-3">
-            <span className="text-xl">⚠️</span>
+            <AlertTriangle size={22} className="text-amber-400 shrink-0" />
             <div>
               <p className="font-bold text-sm">Perhatian: {lowStockCount} Produk Menipis/Habis!</p>
               <p className="text-xs text-amber-200/80">Klik di sini untuk segera lakukan restock barang di menu Manajemen Stok.</p>
