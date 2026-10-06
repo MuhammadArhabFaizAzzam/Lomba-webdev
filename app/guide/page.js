@@ -6,8 +6,8 @@ export default function GuidePage() {
   return (
     <div className="space-y-8 animate-fadeIn max-w-4xl mx-auto py-4">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 md:p-8 text-white shadow-xl border border-slate-800">
-        <span className="bg-indigo-500/30 text-indigo-200 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
+      <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-2xl p-6 md:p-8 text-white shadow-xl border border-slate-800">
+        <span className="bg-emerald-500/30 text-emerald-200 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
           Panduan Evaluasi Juri
         </span>
         <h2 className="text-2xl md:text-3xl font-bold mt-2">Panduan Penggunaan &amp; Fitur UMKM-Pro</h2>
@@ -21,7 +21,7 @@ export default function GuidePage() {
         {/* Step 1 */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 font-bold flex items-center justify-center text-lg mb-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center text-lg mb-4">
               1
             </div>
             <h3 className="text-lg font-bold text-slate-800 mb-2">Manajemen Stok & Produk</h3>
@@ -31,7 +31,7 @@ export default function GuidePage() {
           </div>
           <Link
             href="/inventory"
-            className="inline-flex items-center justify-center py-2.5 px-4 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-indigo-600 transition"
+            className="inline-flex items-center justify-center py-2.5 px-4 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-emerald-600 transition"
           >
             Buka Manajemen Stok &rarr;
           </Link>
@@ -59,7 +59,7 @@ export default function GuidePage() {
         {/* Step 3 */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 font-bold flex items-center justify-center text-lg mb-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center text-lg mb-4">
               3
             </div>
             <h3 className="text-lg font-bold text-slate-800 mb-2">Riwayat & Export Laporan</h3>
@@ -69,7 +69,7 @@ export default function GuidePage() {
           </div>
           <Link
             href="/transactions"
-            className="inline-flex items-center justify-center py-2.5 px-4 bg-sky-600 text-white rounded-xl text-xs font-semibold hover:bg-sky-500 transition"
+            className="inline-flex items-center justify-center py-2.5 px-4 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-500 transition"
           >
             Buka Riwayat Transaksi &rarr;
           </Link>

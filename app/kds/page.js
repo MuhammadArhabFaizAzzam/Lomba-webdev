@@ -61,7 +61,7 @@ export default function KDSPage() {
       case 'READY':
         return <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-semibold flex items-center gap-1.5"><CheckCircle2 size={13} /> Siap Saji</span>;
       case 'COMPLETED':
-        return <span className="px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full text-xs font-semibold flex items-center gap-1.5">Selesai</span>;
+        return <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-semibold flex items-center gap-1.5">Selesai</span>;
       default:
         return null;
     }
@@ -80,7 +80,7 @@ export default function KDSPage() {
               <ArrowLeft size={20} />
             </Link>
             <div>
-              <div className="flex items-center gap-2 text-violet-400 font-medium text-sm mb-1">
+              <div className="flex items-center gap-2 text-emerald-400 font-medium text-sm mb-1">
                 <ChefHat size={18} />
                 <span>Kitchen Display System (KDS)</span>
               </div>
@@ -95,7 +95,7 @@ export default function KDSPage() {
                 onClick={() => setFilterStatus(st)}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${
                   filterStatus === st
-                    ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/30'
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
                     : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-800'
                 }`}
               >
@@ -118,11 +118,11 @@ export default function KDSPage() {
                 key={order.id}
                 className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between relative overflow-hidden"
               >
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 to-teal-400" />
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-amber-400" />
                 
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <span className="font-mono font-bold text-violet-400 text-sm bg-violet-950/50 px-3 py-1 rounded-lg border border-violet-800/40">
+                    <span className="font-mono font-bold text-emerald-400 text-sm bg-emerald-950/50 px-3 py-1 rounded-lg border border-emerald-800/40">
                       {order.id}
                     </span>
                     {getStatusBadge(order.status)}
@@ -174,7 +174,7 @@ export default function KDSPage() {
                     {order.status === 'READY' && (
                       <button
                         onClick={() => updateStatus(order.id, 'COMPLETED')}
-                        className="col-span-2 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-600/20 transition flex items-center justify-center gap-2"
+                        className="col-span-2 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2"
                       >
                         Selesaikan Pesanan
                       </button>

@@ -243,9 +243,9 @@ export default function TransactionsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div
           onClick={() => { setStatusFilter('Semua'); setMethodFilter('Semua'); }}
-          className="bg-slate-900/80 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
+          className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
         >
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block group-hover:text-indigo-400 transition">Total Tercatat</span>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block group-hover:text-emerald-400 transition">Total Tercatat</span>
           <div className="flex items-baseline justify-between mt-1">
             <span className="text-2xl font-extrabold text-white">{formatRupiah(summary.totalRecorded)}</span>
             <span className="text-xs text-slate-400 font-semibold">{summary.totalCount} Trx</span>
@@ -265,11 +265,11 @@ export default function TransactionsPage() {
 
         <div
           onClick={() => setMethodFilter('QRIS')}
-          className="bg-slate-900/80 border border-slate-800 hover:border-sky-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
+          className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
         >
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block group-hover:text-sky-400 transition">Total QRIS</span>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block group-hover:text-emerald-400 transition">Total QRIS</span>
           <div className="flex items-baseline justify-between mt-1">
-            <span className="text-xl font-extrabold text-sky-400">{summary.qrisPaidCount} Lunas, {summary.qrisPendingCount} Menunggu</span>
+            <span className="text-xl font-extrabold text-emerald-400">{summary.qrisPaidCount} Lunas, {summary.qrisPendingCount} Menunggu</span>
             <span className="text-xs text-slate-400 font-semibold">{summary.qrisTotal} Total</span>
           </div>
         </div>
@@ -305,7 +305,7 @@ export default function TransactionsPage() {
           <select
             value={methodFilter}
             onChange={(e) => setMethodFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 text-white text-xs font-semibold rounded-xl focus:outline-none focus:border-indigo-500"
+            className="px-3 py-2 bg-slate-800 border border-slate-700 text-white text-xs font-semibold rounded-xl focus:outline-none focus:border-emerald-500"
           >
             <option value="Semua">Semua Metode</option>
             <option value="QRIS">QRIS</option>
@@ -318,7 +318,7 @@ export default function TransactionsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 text-white text-xs font-semibold rounded-xl focus:outline-none focus:border-indigo-500"
+            className="px-3 py-2 bg-slate-800 border border-slate-700 text-white text-xs font-semibold rounded-xl focus:outline-none focus:border-emerald-500"
           >
             <option value="Semua">Semua Status</option>
             <option value="Lunas">Lunas</option>
@@ -330,7 +330,7 @@ export default function TransactionsPage() {
           <select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 text-white text-xs font-semibold rounded-xl focus:outline-none focus:border-indigo-500"
+            className="px-3 py-2 bg-slate-800 border border-slate-700 text-white text-xs font-semibold rounded-xl focus:outline-none focus:border-emerald-500"
           >
             <option value="Semua">Semua Waktu</option>
             <option value="Hari Ini">Hari Ini</option>
@@ -374,7 +374,7 @@ export default function TransactionsPage() {
                     onClick={() => { setSelectedTx(tx); setShowModal(true); }}
                     className="cursor-pointer hover:bg-slate-800/40 transition"
                   >
-                    <td className="transaction-id font-mono text-indigo-400 font-bold">{tx.id}</td>
+                    <td className="transaction-id font-mono text-emerald-400 font-bold">{tx.id}</td>
                     <td className="muted-cell text-xs">{tx.date}</td>
                     <td className="text-xs font-semibold text-slate-300">{tx.cashier || 'Kasir Staff'}</td>
                     <td className="item-cell text-xs">
@@ -392,7 +392,7 @@ export default function TransactionsPage() {
                         <button
                           type="button"
                           onClick={() => { setSelectedTx(tx); setShowModal(true); }}
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition"
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-lg transition"
                           title="Lihat Detail"
                         >
                           <Eye size={15} />
@@ -468,7 +468,7 @@ export default function TransactionsPage() {
                         <div className="font-bold text-white">{formatProductName(item.name)}</div>
                         <div className="text-slate-400 text-[11px]">{formatRupiah(item.price)} × {item.qty} unit</div>
                       </div>
-                      <div className="font-bold text-indigo-400 font-mono">
+                      <div className="font-bold text-emerald-400 font-mono">
                         {formatRupiah(item.price * item.qty)}
                       </div>
                     </div>
@@ -495,7 +495,7 @@ export default function TransactionsPage() {
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center space-x-1.5"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center space-x-1.5"
               >
                 <Printer size={14} />
                 <span>Cetak Struk</span>
@@ -521,7 +521,7 @@ export default function TransactionsPage() {
             </div>
             <h3 className="text-lg font-bold text-white mb-2">Konfirmasi Pembayaran Lunas</h3>
             <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-              Tandai transaksi <strong className="text-indigo-400 font-mono">{txToMarkPaid.id}</strong> sebesar <strong className="text-emerald-400">{formatRupiah(txToMarkPaid.total)}</strong> sebagai Lunas? Stok gudang akan otomatis dipotong dan omzet dicatatkan.
+              Tandai transaksi <strong className="text-emerald-400 font-mono">{txToMarkPaid.id}</strong> sebesar <strong className="text-emerald-400">{formatRupiah(txToMarkPaid.total)}</strong> sebagai Lunas? Stok gudang akan otomatis dipotong dan omzet dicatatkan.
             </p>
             <div className="flex space-x-3">
               <button

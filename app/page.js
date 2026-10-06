@@ -215,7 +215,7 @@ export default function Dashboard() {
       const data = payload[0].payload;
       return (
         <div className="bg-slate-900 border border-slate-700 p-3 rounded-xl shadow-xl text-xs text-white">
-          <p className="font-bold text-indigo-400 mb-1">{data.date} ({data.day})</p>
+          <p className="font-bold text-emerald-400 mb-1">{data.date} ({data.day})</p>
           <p className="text-slate-200">Omzet: <span className="font-bold text-emerald-400">{formatRupiah(data.value)}</span></p>
           <p className="text-slate-300">Transaksi: <span className="font-bold">{data.count}x</span></p>
         </div>
@@ -250,9 +250,9 @@ export default function Dashboard() {
 
       {/* Active Shift Summary Banner */}
       {activeShift && (
-        <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 flex flex-wrap items-center justify-between gap-3 shadow-md">
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 flex flex-wrap items-center justify-between gap-3 shadow-md">
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
               <Clock size={18} />
             </div>
             <div>
@@ -260,10 +260,10 @@ export default function Dashboard() {
                 <span className="font-bold text-sm text-white">Shift Kasir Aktif</span>
                 <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">ONLINE</span>
               </div>
-              <p className="text-xs text-indigo-300">Mulai: {activeShift.startTime} | Kas Awal: {formatRupiah(activeShift.startingCash)} | Total Trx Shift: {activeShift.transactionsCount}x</p>
+              <p className="text-xs text-emerald-300">Mulai: {activeShift.startTime} | Kas Awal: {formatRupiah(activeShift.startingCash)} | Total Trx Shift: {activeShift.transactionsCount}x</p>
             </div>
           </div>
-          <Link href="/pos" className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition">
+          <Link href="/pos" className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition">
             Buka Kasir &rarr;
           </Link>
         </div>
@@ -322,21 +322,21 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setTimeRange('today')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${timeRange === 'today' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${timeRange === 'today' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
               >
                 Hari Ini
               </button>
               <button
                 type="button"
                 onClick={() => setTimeRange('7days')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${timeRange === '7days' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${timeRange === '7days' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
               >
                 7 Hari
               </button>
               <button
                 type="button"
                 onClick={() => setTimeRange('30days')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${timeRange === '30days' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${timeRange === '30days' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
               >
                 30 Hari
               </button>
@@ -345,7 +345,7 @@ export default function Dashboard() {
 
           <div className="summary-figure">
             <strong>{formatRupiah(totalRevenue)}</strong>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
               {totalTransactionsCount > 0 ? `${totalTransactionsCount} Transaksi (${timeRange})` : 'Belum ada transaksi'}
             </span>
           </div>
@@ -448,7 +448,7 @@ export default function Dashboard() {
               topSellingProducts.map((p, idx) => (
                 <div key={p.name} className="flex items-center justify-between p-2.5 bg-slate-800/40 rounded-xl border border-slate-700/60 text-xs">
                   <div className="flex items-center space-x-2.5 truncate">
-                    <span className="w-5 h-5 rounded-lg bg-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
+                    <span className="w-5 h-5 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
                     <span className="font-bold text-white truncate">{p.name}</span>
                   </div>
                   <div className="text-right shrink-0">

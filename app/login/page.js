@@ -66,7 +66,7 @@ export default function LoginPage() {
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 animate-fadeIn">
       <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-8 md:p-10">
         <div className="flex items-center space-x-3 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-600/30">
+          <div className="w-12 h-12 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-emerald-600/30">
             Z
           </div>
           <div>
@@ -93,7 +93,7 @@ export default function LoginPage() {
               placeholder="Contoh: kasir atau management"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-medium text-slate-900 transition"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50 font-medium text-slate-900 transition"
             />
           </div>
 
@@ -108,29 +108,29 @@ export default function LoginPage() {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-medium text-slate-900 transition"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50 font-medium text-slate-900 transition"
             />
           </div>
 
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-600 space-y-1.5">
             <p className="font-bold text-slate-900 flex items-center space-x-1.5">
-              <Key size={14} className="text-indigo-600" />
+              <Key size={14} className="text-emerald-600" />
               <span>Demo Credentials:</span>
             </p>
             <div className="flex justify-between items-center bg-white p-2 rounded border border-slate-200">
               <span className="font-medium text-slate-700">Kasir:</span>
-              <code className="font-mono text-indigo-600 font-bold">kasir / kasir123</code>
+              <code className="font-mono text-emerald-600 font-bold">kasir / kasir123</code>
             </div>
             <div className="flex justify-between items-center bg-white p-2 rounded border border-slate-200">
               <span className="font-medium text-slate-700">Management:</span>
-              <code className="font-mono text-indigo-600 font-bold">management / admin123</code>
+              <code className="font-mono text-emerald-600 font-bold">management / admin123</code>
             </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-indigo-600/30 transition flex items-center justify-center space-x-2 disabled:opacity-50"
+            className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-600/30 transition flex items-center justify-center space-x-2 disabled:opacity-50"
           >
             {loading ? (
               <span>Memproses...</span>
@@ -141,7 +141,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-          <Link href="/" className="text-xs font-semibold text-slate-600 hover:text-indigo-600 transition">
+          <Link href="/" className="text-xs font-semibold text-slate-600 hover:text-emerald-600 transition">
             &larr; Kembali ke Dashboard Publik
           </Link>
         </div>

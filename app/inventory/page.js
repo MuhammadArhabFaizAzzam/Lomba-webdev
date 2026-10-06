@@ -509,7 +509,7 @@ export default function InventoryPage() {
           </button>
           <button
             onClick={() => setShowPresetModal(true)}
-            className="bg-sky-600 hover:bg-sky-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-sky-600/20 transition flex items-center space-x-2"
+            className="bg-emerald-700 hover:bg-emerald-600 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-700/20 transition flex items-center space-x-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -534,9 +534,9 @@ export default function InventoryPage() {
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Produk</p>
             <h3 className="text-2xl font-extrabold text-slate-800 mt-1">{products.length}</h3>
-            <span className="text-xs text-indigo-600 font-semibold mt-1 inline-block">Item terdaftar</span>
+            <span className="text-xs text-emerald-600 font-semibold mt-1 inline-block">Item terdaftar</span>
           </div>
-          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-bold text-xl">
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center font-bold text-xl">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
@@ -581,21 +581,21 @@ export default function InventoryPage() {
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
             <Search size={16} />
           </span>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Cari produk berdasarkan nama..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 transition"
-          />
-        </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Cari produk berdasarkan nama..."
+              className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 transition"
+            />
+          </div>
 
-        {/* Stock Status Filter */}
-        <select
-          value={stockStatusFilter}
-          onChange={(e) => setStockStatusFilter(e.target.value)}
-          className="px-4 py-2.5 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:border-indigo-600 transition"
-        >
+          {/* Stock Status Filter */}
+          <select
+            value={stockStatusFilter}
+            onChange={(e) => setStockStatusFilter(e.target.value)}
+            className="px-4 py-2.5 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-600 transition"
+          >
           <option value="Semua">Semua Status Stok</option>
           <option value="Normal">Stok Normal (&gt;20)</option>
           <option value="Menipis">Stok Menipis (1-20)</option>
@@ -638,7 +638,7 @@ export default function InventoryPage() {
               {filteredProducts.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="py-16 text-center text-slate-400 text-sm font-medium">
-                    Tidak ada produk ditemukan. Silakan tambahkan produk baru atau gunakan <button onClick={() => setShowPresetModal(true)} className="text-sky-600 underline font-semibold">Preset Data</button>.
+                    Tidak ada produk ditemukan. Silakan tambahkan produk baru atau gunakan <button onClick={() => setShowPresetModal(true)} className="text-emerald-600 underline font-semibold">Preset Data</button>.
                   </td>
                 </tr>
               ) : (
@@ -650,7 +650,7 @@ export default function InventoryPage() {
                         {p.category}
                       </span>
                     </td>
-                    <td className="py-4 px-6 font-extrabold text-indigo-600">{formatRupiah(p.price)}</td>
+                    <td className="py-4 px-6 font-extrabold text-emerald-600">{formatRupiah(p.price)}</td>
                     <td className="py-4 px-6 font-bold text-slate-700">{p.stock} pcs</td>
                     <td className="py-4 px-6">{getStockBadge(p.stock)}</td>
                     <td className="py-4 px-6 text-center">
@@ -672,7 +672,7 @@ export default function InventoryPage() {
                         </button>
                         <button
                           onClick={() => { setRestockProduct(p); setRestockAmount('10'); setShowRestockModal(true); }}
-                          className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded shadow-2xs transition ml-1"
+                          className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded shadow-2xs transition ml-1"
                           title="Restock Massal"
                         >
                           Restock +
@@ -682,7 +682,7 @@ export default function InventoryPage() {
                     <td className="py-4 px-6 text-right space-x-2">
                       <button
                         onClick={() => handleOpenEdit(p)}
-                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-semibold rounded-lg text-xs transition"
+                        className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-semibold rounded-lg text-xs transition"
                       >
                         Edit
                       </button>
@@ -715,18 +715,18 @@ export default function InventoryPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-1">
               {BUILT_IN_PRESETS.map((preset) => (
-                <div key={preset.id} className="p-4 rounded-xl border border-slate-200 hover:border-indigo-600 bg-slate-50/50 flex flex-col justify-between transition group">
+                <div key={preset.id} className="p-4 rounded-xl border border-slate-200 hover:border-emerald-600 bg-slate-50/50 flex flex-col justify-between transition group">
                   <div>
-                    <h4 className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition">{preset.name}</h4>
+                    <h4 className="font-bold text-slate-800 text-sm group-hover:text-emerald-600 transition">{preset.name}</h4>
                     <p className="text-xs text-slate-500 mt-1 leading-relaxed">{preset.description}</p>
-                    <span className="inline-block mt-3 px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 font-semibold text-[11px]">
+                    <span className="inline-block mt-3 px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 font-semibold text-[11px]">
                       {preset.products.length} Produk siap muat
                     </span>
                   </div>
                   <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-end">
                     <button
                       onClick={() => handleInitiateLoadPreset(preset)}
-                      className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition shadow-xs"
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition shadow-xs"
                     >
                       Gunakan Preset &rarr;
                     </button>
@@ -738,7 +738,7 @@ export default function InventoryPage() {
             <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center">
               <button
                 onClick={() => setShowSavePresetModal(true)}
-                className="text-xs font-bold text-indigo-600 hover:underline"
+                className="text-xs font-bold text-emerald-600 hover:underline"
               >
                 + Simpan Stok Saat Ini sebagai Preset Baru
               </button>
@@ -760,16 +760,16 @@ export default function InventoryPage() {
             </p>
 
             <div className="space-y-3 mb-6">
-              <label className={`flex items-start p-3.5 rounded-xl border cursor-pointer transition ${loadMode === 'add' ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-200'}`}>
-                <input type="radio" name="loadMode" checked={loadMode === 'add'} onChange={() => setLoadMode('add')} className="mt-0.5 mr-3 accent-indigo-600" />
+              <label className={`flex items-start p-3.5 rounded-xl border cursor-pointer transition ${loadMode === 'add' ? 'border-emerald-600 bg-emerald-50/50' : 'border-slate-200'}`}>
+                <input type="radio" name="loadMode" checked={loadMode === 'add'} onChange={() => setLoadMode('add')} className="mt-0.5 mr-3 accent-emerald-600" />
                 <div>
                   <strong className="text-xs text-slate-800 block">Gabungkan (Rekomendasi)</strong>
                   <span className="text-[11px] text-slate-500">Tambahkan produk baru dan pertahankan produk yang sudah ada.</span>
                 </div>
               </label>
 
-              <label className={`flex items-start p-3.5 rounded-xl border cursor-pointer transition ${loadMode === 'replace' ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-200'}`}>
-                <input type="radio" name="loadMode" checked={loadMode === 'replace'} onChange={() => setLoadMode('replace')} className="mt-0.5 mr-3 accent-indigo-600" />
+              <label className={`flex items-start p-3.5 rounded-xl border cursor-pointer transition ${loadMode === 'replace' ? 'border-emerald-600 bg-emerald-50/50' : 'border-slate-200'}`}>
+                <input type="radio" name="loadMode" checked={loadMode === 'replace'} onChange={() => setLoadMode('replace')} className="mt-0.5 mr-3 accent-emerald-600" />
                 <div>
                   <strong className="text-xs text-slate-800 block">Timpa Seluruhnya (Ganti Total)</strong>
                   <span className="text-[11px] text-slate-500">Hapus inventaris saat ini dan ganti dengan isi preset ini.</span>
@@ -779,7 +779,7 @@ export default function InventoryPage() {
 
             <div className="flex space-x-3">
               <button onClick={() => setShowLoadConfirmModal(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">Batal</button>
-              <button onClick={handleExecuteLoadPreset} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition">Muat Sekarang</button>
+              <button onClick={handleExecuteLoadPreset} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition">Muat Sekarang</button>
             </div>
           </div>
         </div>
@@ -790,7 +790,7 @@ export default function InventoryPage() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-900 mb-1">Restock Produk</h3>
-            <p className="text-xs text-slate-500 mb-4">Tambah stok untuk <strong className="text-indigo-600">{restockProduct.name}</strong> (Stok saat ini: {restockProduct.stock} pcs)</p>
+            <p className="text-xs text-slate-500 mb-4">Tambah stok untuk <strong className="text-emerald-600">{restockProduct.name}</strong> (Stok saat ini: {restockProduct.stock} pcs)</p>
             
             <form onSubmit={handleQuickRestockSubmit} className="space-y-4">
               <div>
@@ -801,7 +801,7 @@ export default function InventoryPage() {
                   required
                   value={restockAmount}
                   onChange={(e) => setRestockAmount(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-bold"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50 font-bold"
                   autoFocus
                 />
               </div>
@@ -833,7 +833,7 @@ export default function InventoryPage() {
                   value={savePresetForm.name}
                   onChange={(e) => setSavePresetForm({ ...savePresetForm, name: e.target.value })}
                   placeholder="Contoh: Toko Cabang Utama"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50"
                 />
               </div>
               <div>
@@ -843,7 +843,7 @@ export default function InventoryPage() {
                   onChange={(e) => setSavePresetForm({ ...savePresetForm, description: e.target.value })}
                   placeholder="Contoh: Stok standar untuk cabang utama"
                   rows="3"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 resize-none"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50 resize-none"
                 ></textarea>
               </div>
 
@@ -857,7 +857,7 @@ export default function InventoryPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/30 transition"
+                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/30 transition"
                 >
                   Simpan Preset
                 </button>
@@ -878,11 +878,11 @@ export default function InventoryPage() {
             <form onSubmit={handleAddProduct} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama Produk</label>
-                <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Contoh: Kopi Susu Aren" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50" />
+                <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Contoh: Kopi Susu Aren" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Kategori</label>
-                <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50">
+                <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50">
                   <option value="Makanan">Makanan</option>
                   <option value="Minuman">Minuman</option>
                   <option value="Cemilan">Cemilan</option>
@@ -891,16 +891,16 @@ export default function InventoryPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Harga Jual Satuan (Rp)</label>
-                <input type="text" required value={form.price} onChange={(e) => setForm({ ...form, price: formatNumberInput(e.target.value) })} onBlur={(e) => handlePriceBlur(e.target.value, 'add', 'price')} placeholder="Contoh: 15.000" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-medium" />
+                <input type="text" required value={form.price} onChange={(e) => setForm({ ...form, price: formatNumberInput(e.target.value) })} onBlur={(e) => handlePriceBlur(e.target.value, 'add', 'price')} placeholder="Contoh: 15.000" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50 font-medium" />
                 <span className="text-[10px] text-slate-400 mt-1 block">*Estimasi margin keuntungan kotor ~30% dihitung otomatis.</span>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Jumlah Stok Awal</label>
-                <input type="number" required min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="Contoh: 25" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50" />
+                <input type="number" required min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="Contoh: 25" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50" />
               </div>
               <div className="pt-4 flex justify-end space-x-3">
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">Batal</button>
-                <button type="submit" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/30 transition">Simpan Produk</button>
+                <button type="submit" className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/30 transition">Simpan Produk</button>
               </div>
             </form>
           </div>
@@ -917,11 +917,11 @@ export default function InventoryPage() {
             <form onSubmit={handleUpdateProduct} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama Produk</label>
-                <input type="text" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50" />
+                <input type="text" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Kategori</label>
-                <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50">
+                <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50">
                   <option value="Makanan">Makanan</option>
                   <option value="Minuman">Minuman</option>
                   <option value="Cemilan">Cemilan</option>
@@ -930,15 +930,15 @@ export default function InventoryPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Harga Jual Satuan (Rp)</label>
-                <input type="text" required value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: formatNumberInput(e.target.value) }) } onBlur={(e) => handlePriceBlur(e.target.value, 'edit', 'price')} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50 font-medium" />
+                <input type="text" required value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: formatNumberInput(e.target.value) }) } onBlur={(e) => handlePriceBlur(e.target.value, 'edit', 'price')} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50 font-medium" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Jumlah Stok</label>
-                <input type="number" required min="0" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-600 bg-slate-50" />
+                <input type="number" required min="0" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50" />
               </div>
               <div className="pt-4 flex justify-end space-x-3">
                 <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">Batal</button>
-                <button type="submit" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/30 transition">Perbarui Produk</button>
+                <button type="submit" className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/30 transition">Perbarui Produk</button>
               </div>
             </form>
           </div>
