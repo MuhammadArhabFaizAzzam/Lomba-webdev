@@ -17,7 +17,9 @@ import {
   X,
   Sparkles,
   AlertTriangle,
-  Bell
+  Bell,
+  Users,
+  Truck
 } from 'lucide-react';
 import { readStoredArray, normalizeProduct } from './utils/storage';
 
@@ -175,6 +177,18 @@ export default function ClientLayout({ children }) {
               badge: lowStockCount > 0 ? `${lowStockCount} Menipis` : null,
               badgeType: 'warning',
               description: 'Katalog produk & stok gudang',
+            },
+            {
+              name: 'Pelanggan & CRM',
+              href: '/customers',
+              icon: Users,
+              description: 'Member loyalty & poin',
+            },
+            {
+              name: 'Supplier & PO',
+              href: '/suppliers',
+              icon: Truck,
+              description: 'Vendor & purchase order',
             },
           ],
         },
