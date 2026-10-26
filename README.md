@@ -28,3 +28,8 @@ npm run lint
 ```
 
 Both commands should pass before deployment.
+
+## Deployment
+
+- **Vercel:** use the repository root as the project root and leave `DEPLOY_TARGET` unset. The app is served from the domain root.
+- **GitHub Pages:** the included workflow sets `DEPLOY_TARGET=github-pages`, enabling the `/Lomba-webdev` repository path while exporting the static site to `out`.

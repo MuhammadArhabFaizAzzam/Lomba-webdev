@@ -35,6 +35,8 @@ jobs:
         run: npm ci
 
       - name: Build with Next.js
+        env:
+          DEPLOY_TARGET: github-pages
         run: npm run build
 
       - name: Upload artifact
