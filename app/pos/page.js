@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Minus, Plus, Search, ShoppingCart, Trash2, ShieldCheck, MessageCircle, Clock } from 'lucide-react';
+import { Minus, Plus, Search, ShoppingCart, Trash2, ShieldCheck, MessageCircle, Clock, Users, QrCode, Printer, Scan, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import { formatRupiah } from '../utils/formatCurrency';
 import {
   normalizeNonNegativeNumber,
@@ -23,12 +23,6 @@ const formatProductName = (name) => {
     .join(' ');
 };
 
-const getStockBadgeStyle = (stock) => {
-  if (stock === 0) return { bg: 'rgba(248, 113, 113, 0.12)', color: 'var(--danger)', text: 'Habis' };
-  if (stock <= 10) return { bg: 'rgba(251, 191, 36, 0.12)', color: 'var(--warning)', text: `${stock} stok` };
-  return { bg: 'rgba(52, 211, 153, 0.08)', color: 'var(--success)', text: `${stock} stok` };
-};
-
 export default function POSPage() {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
@@ -41,6 +35,16 @@ export default function POSPage() {
   const [receiptData, setReceiptData] = useState(null);
   const [cashReceived, setCashReceived] = useState('');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  // Advanced POS Features
+  const [customers, setCustomers] = useState([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [includeTax, setIncludeTax] = useState(true);
+  const [includeService, setIncludeService] = useState(false);
+  const [receiptWidth, setReceiptWidth] = useState('80mm');
+  const [showEscPosModal, setShowEscPosModal] = useState(false);
+  const [showScannerModal, setShowScannerModal] = useState(false);
+  const [scannerCode, setScannerCode] = useState('');
 
   // Dynamic QRIS States
   const [activeQrisOrder, setActiveQrisOrder] = useState(null);
@@ -65,6 +69,7 @@ export default function POSPage() {
 
   useEffect(() => {
     setProducts(readStoredArray('products').map(normalizeProduct));
+    setCustomers(readStoredArray('zenith_customers'));
     const savedTheme = localStorage.getItem('zenith_pos_theme');
     setThemeMode(savedTheme || 'dark');
 
@@ -151,7 +156,16 @@ export default function POSPage() {
     });
   }, [products, searchQuery, selectedCategory]);
 
-  const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const selectedCustomer = useMemo(() => {
+    return customers.find(c => c.id === selectedCustomerId) || null;
+  }, [customers, selectedCustomerId]);
+
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const taxAmount = includeTax ? subtotal * 0.11 : 0;
+  const serviceAmount = includeService ? subtotal * 0.05 : 0;
+  const discountAmount = selectedCustomer?.tier === 'Gold' ? subtotal * 0.05 : selectedCustomer?.tier === 'Silver' ? subtotal * 0.03 : 0;
+  const total = Math.max(0, subtotal + taxAmount + serviceAmount - discountAmount);
+
   const cashAmount = normalizeNonNegativeNumber(String(cashReceived).replace(/\D/g, ''));
   const change = Math.max(0, cashAmount - total);
 
@@ -197,23 +211,16 @@ export default function POSPage() {
     setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
   };
 
-  const verifyManagerPin = (actionName, callback) => {
-    setPendingAction({ name: actionName, callback });
-    setShowPinModal(true);
-  };
-
-  const handlePinSubmit = (e) => {
+  const handleScannerSubmit = (e) => {
     e.preventDefault();
-    if (pinInput === '1234' || pinInput === 'admin123') {
-      showToast('Otorisasi manajer berhasil diterima.');
-      setShowPinModal(false);
-      setPinInput('');
-      if (pendingAction && typeof pendingAction.callback === 'function') {
-        pendingAction.callback();
-      }
-      setPendingAction(null);
+    const found = products.find(p => p.name.toLowerCase().includes(scannerCode.toLowerCase()) || p.id === scannerCode);
+    if (found) {
+      addToCart(found);
+      setScannerCode('');
+      setShowScannerModal(false);
+      showToast(`Produk "${found.name}" ditambahkan via Barcode Scanner!`);
     } else {
-      showToast('PIN Manajer salah! (Coba: 1234)');
+      showToast('Produk dengan kode/nama tersebut tidak ditemukan.');
     }
   };
 
@@ -239,7 +246,7 @@ export default function POSPage() {
       status: 'PENDING',
     });
     setQrisTimer(300);
-    showToast('QRIS Pembayaran dibuat. Silakan scan.');
+    showToast('QRIS Pembayaran Dinamis dibuat. Silakan scan.');
   };
 
   const handleSimulateQrisPaid = () => {
@@ -258,11 +265,13 @@ export default function POSPage() {
       id: transactionId,
       date: dateStr,
       createdAt: now.toISOString(),
-      payment: 'QRIS (Dynamic)',
-      subtotal: activeQrisOrder.amount,
-      discountPercent: 0,
-      discountAmount: 0,
+      payment: 'QRIS (Dynamic Gateway)',
+      subtotal,
+      taxAmount,
+      serviceAmount,
+      discountAmount,
       total: activeQrisOrder.amount,
+      customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
       cashReceived: null,
       change: null,
       items: activeQrisOrder.items.map((item) => ({
@@ -275,6 +284,26 @@ export default function POSPage() {
 
     const nextTransactions = [transaction, ...readStoredArray('transactions')];
     writeStoredArray('transactions', nextTransactions);
+
+    // Update customer points & total spent if customer selected
+    if (selectedCustomer) {
+      const earnedPoints = Math.floor(activeQrisOrder.amount / 10000);
+      const allCusts = readStoredArray('zenith_customers');
+      const updatedCusts = allCusts.map(c => {
+        if (c.id === selectedCustomer.id) {
+          const newTotalSpent = (c.totalSpent || 0) + activeQrisOrder.amount;
+          const newPoints = (c.points || 0) + earnedPoints;
+          let newTier = c.tier;
+          if (newTotalSpent >= 1000000) newTier = 'Gold';
+          else if (newTotalSpent >= 500000) newTier = 'Silver';
+          return { ...c, totalSpent: newTotalSpent, points: newPoints, tier: newTier };
+        }
+        return c;
+      });
+      writeStoredArray('zenith_customers', updatedCusts);
+      setCustomers(updatedCusts);
+      showToast(`Member +${earnedPoints} Poin Loyalitas!`);
+    }
 
     // Update active shift stats if active
     if (activeShift) {
@@ -304,8 +333,11 @@ export default function POSPage() {
       date: transaction.date,
       payment: transaction.payment,
       total: transaction.total,
-      subtotal: transaction.subtotal,
-      discountAmount: 0,
+      subtotal,
+      taxAmount,
+      serviceAmount,
+      discountAmount,
+      customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
       cashReceived: null,
       change: null,
       cartItems: transaction.items,
@@ -313,13 +345,9 @@ export default function POSPage() {
     setShowReceiptModal(true);
     setCart([]);
     setActiveQrisOrder(null);
+    setSelectedCustomerId('');
     setPaymentMethod('QRIS');
-    showToast('Pembayaran QRIS Berhasil & Lunas!');
-  };
-
-  const handleCancelQris = () => {
-    setActiveQrisOrder(null);
-    showToast('QRIS dibatalkan.');
+    showToast('Pembayaran QRIS Berhasil & Lunas via Webhook Simulator!');
   };
 
   const handleCheckout = () => {
@@ -362,10 +390,12 @@ export default function POSPage() {
       date: dateStr,
       createdAt: now.toISOString(),
       payment: paymentMethod,
-      subtotal: total,
-      discountPercent: 0,
-      discountAmount: 0,
+      subtotal,
+      taxAmount,
+      serviceAmount,
+      discountAmount,
       total,
+      customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
       cashReceived: paymentMethod === 'Tunai' ? cashAmount : null,
       change: paymentMethod === 'Tunai' ? change : null,
       items: cart.map((item) => ({
@@ -378,6 +408,26 @@ export default function POSPage() {
 
     const nextTransactions = [transaction, ...readStoredArray('transactions')];
     writeStoredArray('transactions', nextTransactions);
+
+    // Update customer points & total spent if customer selected
+    if (selectedCustomer) {
+      const earnedPoints = Math.floor(total / 10000);
+      const allCusts = readStoredArray('zenith_customers');
+      const updatedCusts = allCusts.map(c => {
+        if (c.id === selectedCustomer.id) {
+          const newTotalSpent = (c.totalSpent || 0) + total;
+          const newPoints = (c.points || 0) + earnedPoints;
+          let newTier = c.tier;
+          if (newTotalSpent >= 1000000) newTier = 'Gold';
+          else if (newTotalSpent >= 500000) newTier = 'Silver';
+          return { ...c, totalSpent: newTotalSpent, points: newPoints, tier: newTier };
+        }
+        return c;
+      });
+      writeStoredArray('zenith_customers', updatedCusts);
+      setCustomers(updatedCusts);
+      showToast(`Member +${earnedPoints} Poin Loyalitas!`);
+    }
 
     // Update active shift stats if active
     if (activeShift) {
@@ -392,7 +442,6 @@ export default function POSPage() {
       localStorage.setItem('zenith_active_shift', JSON.stringify(updatedShift));
     }
 
-    // Also push to KDS statuses
     const kdsStatuses = readStoredArray('kds_statuses');
     writeStoredArray('kds_statuses', [{ id: transactionId, status: 'PENDING' }, ...kdsStatuses]);
 
@@ -410,8 +459,11 @@ export default function POSPage() {
       date: transaction.date,
       payment: transaction.payment,
       total: transaction.total,
-      subtotal: transaction.subtotal,
-      discountAmount: 0,
+      subtotal,
+      taxAmount,
+      serviceAmount,
+      discountAmount,
+      customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
       cashReceived: transaction.cashReceived,
       change: transaction.change,
       cartItems: transaction.items,
@@ -419,6 +471,7 @@ export default function POSPage() {
     setShowReceiptModal(true);
     setCart([]);
     setCashReceived('');
+    setSelectedCustomerId('');
     setPaymentMethod('QRIS');
     setIsCheckingOut(false);
   };
@@ -503,346 +556,391 @@ export default function POSPage() {
                   value={actualCashInput}
                   onChange={(e) => setActualCashInput(e.target.value.replace(/\D/g, ''))}
                   className="input"
-                  placeholder="Contoh: 250000"
+                  placeholder="Masukkan total hitung fisik uang"
                   required
                 />
               </label>
-              <div className="modal-actions" style={{ marginTop: '10px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowCloseShiftModal(false)}
-                  className="btn-secondary"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  style={{ background: 'var(--danger)' }}
-                >
-                  Tutup Shift & Rekap
-                </button>
+              <div className="modal-actions" style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
+                <button type="button" onClick={() => setShowCloseShiftModal(false)} className="btn-secondary" style={{ flex: 1 }}>Batal</button>
+                <button type="submit" className="btn-primary" style={{ flex: 1 }}>Rekonsiliasi &amp; Tutup Shift</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Manager PIN Modal */}
-      {showPinModal && (
+      {/* Barcode Scanner Modal */}
+      {showScannerModal && (
         <div className="modal-backdrop">
-          <div className="modal-card" style={{ textAlign: 'center' }}>
-            <div style={{ display: 'grid', placeItems: 'center', marginBottom: '12px' }}>
-              <ShieldCheck className="text-amber-400" size={36} />
+          <div className="modal-card" style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <div>
+                <span className="eyebrow" style={{ color: 'var(--accent-primary)' }}>Scanner Simulation</span>
+                <h3>Scan Barcode / QR Produk</h3>
+              </div>
+              <button onClick={() => setShowScannerModal(false)} className="text-slate-400 hover:text-white"><X size={18} /></button>
             </div>
-            <h3 style={{ fontSize: '1.2rem', marginBottom: '6px' }}>Otorisasi Manajer</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '20px' }}>
-              Masukkan PIN Manajer untuk tindakan: <strong style={{ color: 'var(--text-primary)' }}>{pendingAction?.name}</strong>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: '10px 0' }}>
+              Simulasikan pemindaian barcode dengan mengetik kode produk atau nama barang secara instan.
             </p>
-            <form onSubmit={handlePinSubmit} className="form-stack">
+            <form onSubmit={handleScannerSubmit} className="space-y-4">
               <input
-                type="password"
-                maxLength={6}
-                value={pinInput}
-                onChange={(e) => setPinInput(e.target.value)}
-                className="input"
-                style={{ textAlign: 'center', fontSize: '1.5rem', letterSpacing: '0.3em', fontFamily: 'monospace' }}
-                placeholder="••••"
+                type="text"
                 autoFocus
+                value={scannerCode}
+                onChange={(e) => setScannerCode(e.target.value)}
+                className="input"
+                placeholder="Ketik nama atau SKU produk..."
                 required
               />
-              <div className="modal-actions" style={{ marginTop: '14px', justifyContent: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => { setShowPinModal(false); setPinInput(''); }}
-                  className="btn-secondary"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary"
-                >
-                  Verifikasi PIN
-                </button>
+              <div className="flex space-x-3">
+                <button type="button" onClick={() => setShowScannerModal(false)} className="btn-secondary" style={{ flex: 1 }}>Batal</button>
+                <button type="submit" className="btn-primary" style={{ flex: 1 }}>Tambah ke Keranjang</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      <div className="pos-area">
-        <div className="pos-toolbar flex flex-wrap justify-between items-center gap-3">
-          <div>
-            <h2 className="pos-title" style={{ color: 'var(--text-primary)', fontWeight: 800 }}>Kasir Point of Sale</h2>
-            <p className="pos-subtitle" style={{ color: 'var(--text-secondary)' }}>Pilih produk dan proses transaksi penjualan dengan cepat.</p>
-          </div>
+      {/* Dynamic QRIS Gateway Simulation Modal */}
+      {activeQrisOrder && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '440px', textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '10px' }}>
+              <span className="eyebrow" style={{ color: 'var(--accent-primary)' }}>Midtrans / Xendit Sandbox</span>
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300">
+                {Math.floor(qrisTimer / 60)}:{String(qrisTimer % 60).padStart(2, '0')}
+              </span>
+            </div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '4px' }}>Scan QRIS Dinamis</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              ID Transaksi: <span style={{ fontFamily: 'monospace', color: 'var(--accent-secondary)' }}>{activeQrisOrder.id}</span>
+            </p>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {activeShift && (
+            <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', display: 'inline-block', marginBottom: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }}>
+              <div style={{ width: '180px', height: '180px', border: '4px solid #0f172a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: '10px', margin: '0 auto' }}>
+                <QrCode size={110} className="text-slate-900" />
+                <span style={{ fontSize: '9px', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>STANDAR QRIS</span>
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-canvas)', padding: '12px', borderRadius: '12px', marginBottom: '16px', fontSize: '0.8rem' }}>
+              <div style={{ color: 'var(--text-secondary)' }}>Total Tagihan:</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--accent-secondary)' }}>{formatRupiah(activeQrisOrder.amount)}</div>
+            </div>
+
+            <div style={{ display: 'grid', gap: '8px' }}>
               <button
                 type="button"
-                onClick={() => setShowCloseShiftModal(true)}
-                className="pill-button"
-                style={{ background: 'var(--surface-2)', color: 'var(--accent-secondary)', borderColor: 'var(--border-default)' }}
+                onClick={handleSimulateQrisPaid}
+                className="btn-primary"
+                style={{ width: '100%', background: 'linear-gradient(135deg, #10b981, #059669)' }}
               >
-                <Clock size={14} style={{ display: 'inline', marginRight: 4 }} />
-                Shift Aktif ({activeShift.transactionsCount} tx)
+                Simulasi Pembayaran Berhasil (Webhook)
               </button>
-            )}
-            <Link
-              href="/kds"
-              className="pill-button"
-              target="_blank"
-            >
-              Layar Dapur (KDS)
-            </Link>
+              <button
+                type="button"
+                onClick={() => setActiveQrisOrder(null)}
+                className="btn-secondary"
+                style={{ width: '100%' }}
+              >
+                Batalkan QRIS
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Left Catalog Section */}
+      <section className="pos-catalog">
+        <div className="catalog-header">
+          <div>
+            <span className="eyebrow">Pilih Produk &amp; Menu</span>
+            <h2>Katalog Produk UMKM</h2>
+          </div>
+          <div className="flex items-center space-x-2">
             <button
               type="button"
-              className="pill-button"
-              onClick={() => setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+              onClick={() => setShowScannerModal(true)}
+              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md"
             >
-              {themeMode === 'dark' ? 'Dark mode' : 'Light mode'}
+              <Scan size={15} />
+              <span>Scan Barcode</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setThemeMode(themeMode === 'dark' ? 'light' : 'dark')}
+              className="btn-secondary"
+              style={{ padding: '8px 12px', fontSize: '0.75rem' }}
+            >
+              {themeMode === 'dark' ? '☀️ Light' : '🌙 Dark'}
             </button>
           </div>
         </div>
 
-        <div className="filter-row">
-          <div style={{ minWidth: 0, flex: 1, position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
+        {/* Search & Category Filter */}
+        <div className="catalog-toolbar">
+          <div className="search-bar" style={{ flex: 1 }}>
+            <Search size={16} color="var(--text-tertiary)" />
             <input
-              className="input"
               type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Cari nama produk..."
-              style={{ paddingLeft: 36 }}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input-search"
             />
           </div>
-        </div>
 
-        <div className="filter-row" style={{ marginBottom: 0 }}>
-          {categories.map((category) => (
-            <button
-              key={category}
-              type="button"
-              className={`category-button ${selectedCategory === category ? 'active' : ''}`}
-              onClick={() => setSelectedCategory(category)}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-
-        {products.length === 0 ? (
-          <div className="empty-state" style={{ marginTop: 18 }}>
-            <p>Belum ada produk yang bisa dijual. Tambahkan item lewat halaman inventori.</p>
-            <Link href="/inventory" className="btn-primary" style={{ marginTop: 14 }}>
-              Tambah Produk
-            </Link>
+          <div className="category-pills">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`category-pill ${selectedCategory === cat ? 'active' : ''}`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
-        ) : (
-          <div className="product-grid" style={{ marginTop: 18, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', paddingRight: '4px' }}>
-            {filteredProducts.map((product) => {
-              const badge = getStockBadgeStyle(product.stock);
+        </div>
+
+        {/* Products Grid */}
+        <div className="products-grid">
+          {filteredProducts.length === 0 ? (
+            <div className="empty-state" style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              <p>Tidak ada produk yang sesuai dengan pencarian.</p>
+            </div>
+          ) : (
+            filteredProducts.map((product) => {
               const isOutOfStock = product.stock <= 0;
               return (
-                <button
+                <div
                   key={product.id}
-                  type="button"
-                  className={`tap-card ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}`}
                   onClick={() => addToCart(product)}
-                  disabled={isOutOfStock}
+                  className={`product-card ${isOutOfStock ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
-                  <div className="product-head">
-                    <div>
-                      <div className="product-meta">{product.category}</div>
-                      <h3 className="product-name">{formatProductName(product.name)}</h3>
-                    </div>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '5px 8px', background: badge.bg, color: badge.color, fontSize: '0.68rem', fontWeight: 700 }}>
-                      {badge.text}
+                  <div className="product-top">
+                    <span className="product-category">{product.category}</span>
+                    <span
+                      className="product-stock"
+                      style={{
+                        background: product.stock === 0 ? 'rgba(248, 113, 113, 0.15)' : product.stock <= 10 ? 'rgba(251, 191, 36, 0.15)' : 'rgba(52, 211, 153, 0.15)',
+                        color: product.stock === 0 ? 'var(--danger)' : product.stock <= 10 ? 'var(--warning)' : 'var(--success)',
+                      }}
+                    >
+                      {product.stock === 0 ? 'Habis' : `${product.stock} stok`}
                     </span>
                   </div>
 
-                  <div>
-                    <div className="product-price">{formatRupiah(product.price)}</div>
-                    <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>{isOutOfStock ? 'Stok Kosong' : 'Tambah ke keranjang'}</span>
-                      <span style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--surface-1)', display: 'grid', placeItems: 'center' }}><Plus size={14} /></span>
-                    </div>
+                  <div className="product-body">
+                    <h4 className="product-name">{formatProductName(product.name)}</h4>
+                    <span className="product-price">{formatRupiah(product.price)}</span>
                   </div>
-                </button>
+                </div>
               );
-            })}
-          </div>
-        )}
-      </div>
+            })
+          )}
+        </div>
+      </section>
 
-      <aside className="cart-panel">
-        <div className="cart-header">
-          <div>
-            <h3 className="panel-title">Keranjang</h3>
-            <div className="quick-value">{cart.length} item</div>
+      {/* Right Cart & Checkout Section */}
+      <aside className="pos-cart">
+        <div className="cart-head">
+          <div className="flex items-center space-x-2">
+            <ShoppingCart size={18} color="var(--accent-secondary)" />
+            <h3 className="cart-title">Keranjang Belanja</h3>
           </div>
-          <button
-            className="pill-button"
-            type="button"
-            onClick={() => verifyManagerPin('Kosongkan Keranjang', () => setCart([]))}
-            aria-label="Kosongkan keranjang"
-          >
-            Reset
-          </button>
+          {activeShift && (
+            <button
+              onClick={() => setShowCloseShiftModal(true)}
+              className="text-[10px] font-bold px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition"
+              title="Tutup Shift Kasir"
+            >
+              Shift: {activeShift.transactionsCount} Trx
+            </button>
+          )}
         </div>
 
-        <div style={{ display: 'grid', gap: '16px' }}>
-          {activeQrisOrder && activeQrisOrder.status === 'PENDING' ? (
-            <div style={{ background: 'var(--surface-2)', borderRadius: '16px', padding: '16px', border: '1px solid var(--border-default)', textAlign: 'center', display: 'grid', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-default)', paddingBottom: '8px' }}>
-                <span className="eyebrow" style={{ color: 'var(--accent-secondary)' }}>QRIS Dinamis</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--warning)' }}>
-                  {Math.floor(qrisTimer / 60)}:{(qrisTimer % 60).toString().padStart(2, '0')}
-                </span>
-              </div>
+        {/* Customer CRM Selector */}
+        <div className="p-3 bg-[var(--bg-canvas)] border-b border-[var(--border-default)]">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold text-[var(--text-secondary)] flex items-center space-x-1">
+              <Users size={12} className="text-emerald-400" />
+              <span>Pelanggan / Member (CRM)</span>
+            </span>
+            <Link href="/customers" className="text-[10px] text-emerald-400 hover:underline font-bold">+ Baru</Link>
+          </div>
+          <select
+            value={selectedCustomerId}
+            onChange={(e) => setSelectedCustomerId(e.target.value)}
+            className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-emerald-500"
+          >
+            <option value="">-- Pembeli Umum (Tanpa Member) --</option>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.tier} Member - {c.points} Poin)
+              </option>
+            ))}
+          </select>
+        </div>
 
-              <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: '12px', display: 'grid', placeItems: 'center', width: '180px', margin: '0 auto' }}>
-                <div style={{ width: '140px', height: '140px', background: '#0A0F1D', display: 'grid', placeItems: 'center', borderRadius: '8px', color: '#F8FAFC', fontSize: '0.7rem', textAlign: 'center', padding: '10px', fontWeight: 'bold' }}>
-                  [ QR CODE ]<br/>
-                  <span style={{ fontSize: '0.55rem', color: '#38BDF8' }}>{activeQrisOrder.id}</span>
-                </div>
-              </div>
-
-              <div>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 4px' }}>Total Tagihan QRIS</p>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--accent-secondary)', margin: 0 }}>{formatRupiah(activeQrisOrder.amount)}</h3>
-              </div>
-
-              <div style={{ padding: '6px 12px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '8px', fontSize: '0.72rem', color: 'var(--warning)', fontWeight: 700 }}>
-                Menunggu Scan & Pembayaran...
-              </div>
-
-              <div style={{ display: 'grid', gap: '8px', marginTop: '6px' }}>
-                <button
-                  type="button"
-                  onClick={handleSimulateQrisPaid}
-                  className="btn-primary"
-                  style={{ width: '100%', background: 'var(--success)', color: '#060913', fontSize: '0.8rem' }}
-                >
-                  Simulasi: Konfirmasi Lunas (Paid)
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelQris}
-                  className="btn-secondary"
-                  style={{ width: '100%', fontSize: '0.8rem' }}
-                >
-                  Batalkan / Buat QR Baru
-                </button>
-              </div>
+        {/* Cart Items List */}
+        <div className="cart-list">
+          {cart.length === 0 ? (
+            <div className="cart-empty">
+              <ShoppingCart size={36} color="var(--text-tertiary)" />
+              <p>Keranjang masih kosong</p>
+              <span>Klik produk di sebelah kiri untuk mulai transaksi</span>
             </div>
           ) : (
-            <div style={{ background: 'var(--surface-2)', borderRadius: '16px', padding: '16px', border: '1px solid var(--border-default)', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-default)', marginBottom: '14px' }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Keranjang Pesanan</h3>
-                <span style={{ padding: '4px 10px', background: 'rgba(139,92,246,0.15)', color: 'var(--accent-primary)', fontSize: '0.75rem', fontWeight: 700, borderRadius: '8px' }}>
-                  {cart.reduce((sum, item) => sum + item.qty, 0)} Item
-                </span>
-              </div>
-
-              <div style={{ display: 'grid', gap: '10px', marginBottom: '16px' }}>
-                {cart.length === 0 ? (
-                  <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.78rem' }}>
-                    Keranjang masih kosong. Pilih produk dari katalog di samping.
-                  </div>
-                ) : (
-                  cart.map((item) => (
-                    <div key={item.id} style={{ padding: '10px 12px', background: 'var(--surface-1)', borderRadius: '12px', border: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <h4 style={{ fontSize: '0.8rem', fontWeight: 700, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>{formatProductName(item.name)}</h4>
-                        <p style={{ fontSize: '0.72rem', color: 'var(--accent-secondary)', fontWeight: 800, margin: 0 }}>{formatRupiah(item.price)}</p>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                        <button type="button" onClick={() => updateQty(item.id, -1)} aria-label={`Kurangi ${item.name}`} style={{ width: 22, height: 22, background: 'var(--surface-2)', color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 700, borderRadius: 6, border: '1px solid var(--border-default)', display: 'grid', placeItems: 'center' }}>-</button>
-                        <span style={{ width: 20, textAlign: 'center', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.qty}</span>
-                        <button type="button" onClick={() => updateQty(item.id, 1)} aria-label={`Tambah ${item.name}`} style={{ width: 22, height: 22, background: 'var(--surface-2)', color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 700, borderRadius: 6, border: '1px solid var(--border-default)', display: 'grid', placeItems: 'center' }}>+</button>
-                        <button type="button" onClick={() => verifyManagerPin(`Hapus ${item.name}`, () => removeFromCart(item.id))} aria-label={`Hapus ${item.name}`} style={{ color: 'var(--text-tertiary)', background: 'none', padding: '2px', cursor: 'pointer' }} title="Hapus">&times;</button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div style={{ display: 'grid', gap: '8px', marginBottom: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-default)' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Metode Pembayaran</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                  {['QRIS', 'Tunai', 'Transfer', 'Kartu Kredit / Debit'].map((method) => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => setPaymentMethod(method)}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: '10px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        border: '1px solid',
-                        borderColor: paymentMethod === method ? 'var(--accent-primary)' : 'var(--border-default)',
-                        background: paymentMethod === method ? 'rgba(139,92,246,0.15)' : 'var(--surface-1)',
-                        color: paymentMethod === method ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      {method}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border-default)', display: 'grid', gap: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  <span>Total Pembayaran:</span>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-secondary)' }}>{formatRupiah(total)}</span>
+            cart.map((item) => (
+              <div key={item.id} className="cart-item">
+                <div className="item-info">
+                  <span className="item-name">{formatProductName(item.name)}</span>
+                  <span className="item-price">{formatRupiah(item.price)}</span>
                 </div>
 
-                {paymentMethod === 'Tunai' && (
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                    Uang diterima
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={cashReceived}
-                      onChange={(event) => setCashReceived(event.target.value.replace(/\D/g, ''))}
-                      className="input"
-                      style={{ marginTop: '4px' }}
-                      placeholder="Rp"
-                    />
-                  </label>
-                )}
-                {paymentMethod === 'Tunai' && cashAmount >= total && (
-                  <div style={{ textAlign: 'right', fontSize: '0.75rem', fontWeight: 700, color: 'var(--success)' }}>Kembalian: {formatRupiah(change)}</div>
-                )}
-                <button
-                  onClick={handleCheckout}
-                  disabled={cart.length === 0 || isCheckingOut}
-                  className="btn-primary"
-                  style={{ width: '100%', marginTop: '4px' }}
-                >
-                  {paymentMethod === 'QRIS' ? 'Buat QRIS Pembayaran' : 'Proses Checkout & Cetak Struk'}
-                </button>
+                <div className="item-controls">
+                  <button type="button" onClick={() => updateQty(item.id, -1)} className="qty-btn">
+                    <Minus size={12} />
+                  </button>
+                  <span className="qty-value">{item.qty}</span>
+                  <button type="button" onClick={() => updateQty(item.id, 1)} className="qty-btn">
+                    <Plus size={12} />
+                  </button>
+                  <button type="button" onClick={() => removeFromCart(item.id)} className="remove-btn">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
-            </div>
+            ))
           )}
+        </div>
+
+        {/* Payment & Summary */}
+        <div className="cart-summary">
+          <div className="payment-methods">
+            {['QRIS', 'Tunai', 'Debit', 'Transfer'].map((method) => (
+              <button
+                key={method}
+                type="button"
+                onClick={() => setPaymentMethod(method)}
+                className={`method-btn ${paymentMethod === method ? 'active' : ''}`}
+              >
+                {method}
+              </button>
+            ))}
+          </div>
+
+          {/* Tax & Service Toggles */}
+          <div className="grid grid-cols-2 gap-2 text-[11px] py-2 border-t border-b border-[var(--border-default)]">
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeTax}
+                onChange={(e) => setIncludeTax(e.target.checked)}
+                className="rounded text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="font-semibold text-[var(--text-secondary)]">PPN (11%)</span>
+            </label>
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeService}
+                onChange={(e) => setIncludeService(e.target.checked)}
+                className="rounded text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="font-semibold text-[var(--text-secondary)]">Service (5%)</span>
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gap: '4px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Subtotal:</span>
+              <span style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{formatRupiah(subtotal)}</span>
+            </div>
+            {includeTax && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>PPN 11%:</span>
+                <span style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{formatRupiah(taxAmount)}</span>
+              </div>
+            )}
+            {includeService && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Service 5%:</span>
+                <span style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{formatRupiah(serviceAmount)}</span>
+              </div>
+            )}
+            {discountAmount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
+                <span>Diskon Member ({selectedCustomer?.tier}):</span>
+                <span style={{ fontFamily: 'monospace' }}>-{formatRupiah(discountAmount)}</span>
+              </div>
+            )}
+          </div>
+
+          <div style={{ paddingTop: '10px', borderTop: '1px solid var(--border-default)', display: 'grid', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              <span>Total Pembayaran:</span>
+              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-secondary)' }}>{formatRupiah(total)}</span>
+            </div>
+
+            {paymentMethod === 'Tunai' && (
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                Uang diterima
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={cashReceived}
+                  onChange={(event) => setCashReceived(event.target.value.replace(/\D/g, ''))}
+                  className="input"
+                  style={{ marginTop: '4px' }}
+                  placeholder="Rp"
+                />
+              </label>
+            )}
+            {paymentMethod === 'Tunai' && cashAmount >= total && (
+              <div style={{ textAlign: 'right', fontSize: '0.75rem', fontWeight: 700, color: 'var(--success)' }}>Kembalian: {formatRupiah(change)}</div>
+            )}
+            <button
+              onClick={handleCheckout}
+              disabled={cart.length === 0 || isCheckingOut}
+              className="btn-primary"
+              style={{ width: '100%', marginTop: '4px' }}
+            >
+              {paymentMethod === 'QRIS' ? 'Buat QRIS Pembayaran' : 'Proses Checkout & Cetak Struk'}
+            </button>
+          </div>
         </div>
       </aside>
 
       {showReceiptModal && receiptData && (
         <div className="modal-backdrop print:p-0 print:bg-white print:static">
-          <div className="modal-card print:shadow-none print:border-none print:w-full print:max-w-none" style={{ fontFamily: 'monospace' }}>
+          <div className="modal-card print:shadow-none print:border-none print:w-full print:max-w-none" style={{ fontFamily: 'monospace', maxWidth: receiptWidth === '58mm' ? '320px' : '440px' }}>
+            <div className="flex justify-between items-center pb-3 border-b border-slate-700 mb-3 print:hidden">
+              <span className="text-xs font-bold text-slate-400">Pengaturan Struk Thermal</span>
+              <div className="flex space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-700 text-xs">
+                <button
+                  onClick={() => setReceiptWidth('80mm')}
+                  className={`px-2.5 py-1 rounded ${receiptWidth === '80mm' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400'}`}
+                >
+                  80mm
+                </button>
+                <button
+                  onClick={() => setReceiptWidth('58mm')}
+                  className={`px-2.5 py-1 rounded ${receiptWidth === '58mm' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400'}`}
+                >
+                  58mm
+                </button>
+              </div>
+            </div>
+
             <div id="printable-receipt" style={{ display: 'grid', gap: '12px' }}>
               <div style={{ textAlign: 'center', paddingBottom: '12px', borderBottom: '1px dashed var(--border-default)' }}>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 900, margin: '0 0 4px', color: 'var(--text-primary)' }}>ZENITH POS RETAIL</h3>
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: 0 }}>Pusat Grosir & Eceran UMKM Professional</p>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: 0 }}>Pusat Grosir &amp; Eceran UMKM Professional</p>
+                <p style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>Member: {receiptData.customerName}</p>
               </div>
 
               <div style={{ fontSize: '0.75rem', display: 'grid', gap: '4px', paddingBottom: '12px', borderBottom: '1px dashed var(--border-default)' }}>
@@ -854,7 +952,7 @@ export default function POSPage() {
                   <span style={{ color: 'var(--text-secondary)' }}>Waktu:</span>
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{receiptData.date}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'between' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Metode Bayar:</span>
                   <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{receiptData.payment}</span>
                 </div>
@@ -877,8 +975,30 @@ export default function POSPage() {
                 ))}
               </div>
 
-              <div style={{ display: 'grid', gap: '6px', paddingBottom: '14px', borderBottom: '1px dashed var(--border-default)', fontSize: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, color: 'var(--text-primary)' }}>
+              <div style={{ display: 'grid', gap: '6px', paddingBottom: '14px', borderBottom: '1px dashed var(--border-default)', fontSize: '0.8rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                  <span>Subtotal:</span>
+                  <span>{formatRupiah(receiptData.subtotal)}</span>
+                </div>
+                {receiptData.taxAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                    <span>PPN 11%:</span>
+                    <span>{formatRupiah(receiptData.taxAmount)}</span>
+                  </div>
+                )}
+                {receiptData.serviceAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                    <span>Service 5%:</span>
+                    <span>{formatRupiah(receiptData.serviceAmount)}</span>
+                  </div>
+                )}
+                {receiptData.discountAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
+                    <span>Diskon Member:</span>
+                    <span>-{formatRupiah(receiptData.discountAmount)}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, color: 'var(--text-primary)', paddingTop: '4px', borderTop: '1px solid var(--border-default)' }}>
                   <span>TOTAL:</span>
                   <span style={{ color: 'var(--accent-secondary)' }}>{formatRupiah(receiptData.total)}</span>
                 </div>

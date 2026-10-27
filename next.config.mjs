@@ -1,8 +1,15 @@
 /** @type {import('next').NextConfig} */
+const isGitHubPagesBuild = process.env.DEPLOY_TARGET === 'github-pages';
+const githubPagesBasePath = '/Lomba-webdev';
+
 const nextConfig = {
   output: 'export',
-  basePath: '/Lomba-webdev',
-  assetPrefix: '/Lomba-webdev',
+  ...(isGitHubPagesBuild
+    ? {
+        basePath: githubPagesBasePath,
+        assetPrefix: `${githubPagesBasePath}/`,
+      }
+    : {}),
   images: {
     unoptimized: true,
   },
