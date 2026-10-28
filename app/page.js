@@ -34,9 +34,23 @@ import {
   LabelList,
 } from 'recharts';
 import { formatRupiah } from './utils/formatCurrency';
-import { normalizeProduct, normalizeTransaction, readStoredArray, removeStoredArray } from './utils/storage';
+import { LOW_STOCK_MAX, ensureInitialCatalog, normalizeProduct, normalizeTransaction, readStoredArray, removeStoredArray, seedDemoSimulationData, transactionGrossProfit } from './utils/storage';
 
-const COLORS = ['#8B5CF6', '#38BDF8', '#34D399', '#FBBF24', '#F87171'];
+const COLORS = ['#10B981', '#38BDF8', '#34D399', '#FBBF24', '#F87171'];
+
+function CustomTooltip({ active, payload }) {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-slate-900 border border-slate-700 p-3 rounded-xl shadow-xl text-xs text-white">
+        <p className="font-bold text-emerald-400 mb-1">{data.date} ({data.day})</p>
+        <p className="text-slate-200">Omzet: <span className="font-bold text-emerald-400">{formatRupiah(data.value)}</span></p>
+        <p className="text-slate-300">Transaksi: <span className="font-bold">{data.count}x</span></p>
+      </div>
+    );
+  }
+  return null;
+}
 
 export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -61,7 +75,7 @@ export default function Dashboard() {
       }
     }
 
-    const loadedProducts = readStoredArray('products').map(normalizeProduct);
+    const loadedProducts = ensureInitialCatalog();
     const loadedTransactions = readStoredArray('transactions').map(normalizeTransaction);
     setProducts(loadedProducts);
     setTransactions(loadedTransactions);
@@ -100,26 +114,33 @@ export default function Dashboard() {
     return transactions;
   }, [transactions, timeRange]);
 
+  const salesTransactions = useMemo(
+    () => filteredTransactions.filter((tx) => tx.status !== 'Retur'),
+    [filteredTransactions],
+  );
+
   // Analytics Calculations
-  const totalRevenue = useMemo(() => filteredTransactions.reduce((sum, tx) => sum + Number(tx.total || 0), 0), [filteredTransactions]);
-  const totalTransactionsCount = filteredTransactions.length;
+  const totalRevenue = useMemo(() => salesTransactions.reduce((sum, tx) => sum + Number(tx.total || 0), 0), [salesTransactions]);
+  const totalTransactionsCount = salesTransactions.length;
   const averageTransaction = totalTransactionsCount > 0 ? totalRevenue / totalTransactionsCount : 0;
 
   const todayStr = new Date().toDateString();
   const todayRevenue = useMemo(() => transactions
-    .filter(tx => new Date(tx.createdAt || tx.date).toDateString() === todayStr)
+    .filter(tx => tx.status !== 'Retur' && new Date(tx.createdAt || tx.date).toDateString() === todayStr)
     .reduce((sum, tx) => sum + Number(tx.total || 0), 0), [transactions, todayStr]);
 
-  const lowStockCount = useMemo(() => products.filter(p => Number(p.stock || 0) <= 5).length, [products]);
+  const lowStockCount = useMemo(() => products.filter(p => Number(p.stock || 0) <= LOW_STOCK_MAX).length, [products]);
   const totalProductsCount = products.length;
 
-  // Estimated Gross Profit (assuming 30% margin)
-  const estimatedGrossProfit = totalRevenue * 0.30;
+  const grossProfit = useMemo(
+    () => salesTransactions.reduce((sum, tx) => sum + transactionGrossProfit(tx, products), 0),
+    [salesTransactions, products],
+  );
 
   // Top Selling Products
   const topSellingProducts = useMemo(() => {
     const map = {};
-    filteredTransactions.forEach(tx => {
+    salesTransactions.forEach(tx => {
       if (Array.isArray(tx.items)) {
         tx.items.forEach(item => {
           const key = item.name || 'Produk';
@@ -132,37 +153,37 @@ export default function Dashboard() {
       }
     });
     return Object.values(map).sort((a, b) => b.qty - a.qty).slice(0, 5);
-  }, [filteredTransactions]);
+  }, [salesTransactions]);
 
   // Stock Turnover Ratio Calculation
   const stockTurnover = useMemo(() => {
-    const totalSold = filteredTransactions.flatMap(tx => tx.items || []).reduce((sum, i) => sum + Number(i.qty || 0), 0);
+    const totalSold = salesTransactions.flatMap(tx => tx.items || []).reduce((sum, i) => sum + Number(i.qty || 0), 0);
     const totalStock = products.reduce((sum, p) => sum + Number(p.stock || 0), 0);
     if (totalStock === 0 && totalSold === 0) return '0.0x';
     const ratio = (totalSold / Math.max(totalStock, 1)).toFixed(1);
     return `${ratio}x`;
-  }, [filteredTransactions, products]);
+  }, [salesTransactions, products]);
 
   // Payment Mix
   const paymentMix = useMemo(() => {
-    const counts = filteredTransactions.reduce((acc, tx) => {
+    const counts = salesTransactions.reduce((acc, tx) => {
       const method = tx.payment || 'QRIS';
       acc[method] = (acc[method] || 0) + 1;
       return acc;
     }, {});
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [filteredTransactions]);
+  }, [salesTransactions]);
 
   // Category Mix
   const categoryMix = useMemo(() => {
-    const counts = filteredTransactions.flatMap(tx => tx.items || []).reduce((acc, item) => {
+    const counts = salesTransactions.flatMap(tx => tx.items || []).reduce((acc, item) => {
       const prod = products.find(p => p.id === item.id || p.name === item.name);
       const cat = prod?.category || 'Lainnya';
       acc[cat] = (acc[cat] || 0) + Number(item.qty || 0);
       return acc;
     }, {});
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [filteredTransactions, products]);
+  }, [salesTransactions, products]);
 
   // Chart Data (7 days or daily breakdown for selected range)
   const chartData = useMemo(() => {
@@ -176,7 +197,7 @@ export default function Dashboard() {
 
     return days.map((day) => {
       const dayStr = day.toDateString();
-      const dayTxs = transactions.filter(tx => new Date(tx.createdAt || tx.date).toDateString() === dayStr);
+      const dayTxs = transactions.filter(tx => tx.status !== 'Retur' && new Date(tx.createdAt || tx.date).toDateString() === dayStr);
       const value = dayTxs.reduce((sum, tx) => sum + Number(tx.total || 0), 0);
       return {
         date: day.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
@@ -191,37 +212,35 @@ export default function Dashboard() {
     { label: 'Total Pendapatan', value: formatRupiah(totalRevenue), trend: timeRange === 'today' ? 'Hari Ini' : timeRange === '7days' ? '7 Hari' : 'Semua', icon: DollarSign, tone: 'primary' },
     { label: 'Total Transaksi', value: String(totalTransactionsCount), trend: 'Aktual', icon: BarChart3, tone: 'secondary' },
     { label: 'Produk Stok Rendah', value: String(lowStockCount), trend: lowStockCount > 0 ? 'Perlu Restock' : 'Aman', icon: Warehouse, tone: 'warning' },
-    { label: 'Estimasi Laba Kotor', value: formatRupiah(estimatedGrossProfit), trend: 'Margin ~30%', icon: TrendingUp, tone: 'danger' },
+    { label: 'Laba Kotor', value: formatRupiah(grossProfit), trend: 'Harga jual − modal', icon: TrendingUp, tone: 'danger' },
   ];
 
   const quickActions = [
     { label: 'Buka Kasir', value: 'Mulai transaksi baru', icon: ShoppingCart, href: '/pos' },
-    { label: 'Manajemen Stok', value: `${lowStockCount} item perlu restock`, icon: Warehouse, href: '/inventory' },
+    { label: 'Manajemen Stok', value: `${lowStockCount} item perlu restock`, icon: Warehouse, href: '/inventory?filter=low' },
     { label: 'Riwayat Transaksi', value: `${transactions.length} total tercatat`, icon: BarChart3, href: '/transactions' },
   ];
 
   const handleResetData = () => {
     if (confirm('Yakin ingin mereset seluruh data ke kondisi awal (0)?')) {
+      localStorage.setItem('zenith_initialized', 'true');
       removeStoredArray('products');
       removeStoredArray('transactions');
       removeStoredArray('shift_history');
+      removeStoredArray('kds_statuses');
       localStorage.removeItem('zenith_active_shift');
-      window.location.reload();
+      setProducts([]);
+      setTransactions([]);
+      setActiveShift(null);
+      showToast('Seluruh data berhasil direset ke 0.');
     }
   };
 
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-slate-900 border border-slate-700 p-3 rounded-xl shadow-xl text-xs text-white">
-          <p className="font-bold text-emerald-400 mb-1">{data.date} ({data.day})</p>
-          <p className="text-slate-200">Omzet: <span className="font-bold text-emerald-400">{formatRupiah(data.value)}</span></p>
-          <p className="text-slate-300">Transaksi: <span className="font-bold">{data.count}x</span></p>
-        </div>
-      );
-    }
-    return null;
+  const handleLoadSimulationData = () => {
+    const { products: seededProducts, transactions: seededTxs } = seedDemoSimulationData();
+    setProducts(seededProducts);
+    setTransactions(seededTxs);
+    showToast('Data simulasi demo (produk & grafik 7 hari) berhasil dimuat!');
   };
 
   return (
@@ -272,14 +291,23 @@ export default function Dashboard() {
       {/* Hero Section */}
       <div className="dashboard-hero">
         <div className="hero-copy">
-          <span className="eyebrow">Zenith POS Analytics Hub</span>
-          <h2>Dashboard Performa Bisnis</h2>
-          <p>Sistem operasional kasir dan manajemen inventaris real-time untuk mendukung performa bisnis retail Anda.</p>
+          <span className="eyebrow">Zenith POS · Business overview</span>
+          <h2>Ambil keputusan dari data toko hari ini.</h2>
+          <p>Pantau omzet, transaksi, stok, dan laba kotor dari satu dashboard operasional yang mudah dipahami tim.</p>
         </div>
 
         <div className="hero-actions">
+          <button
+            className="btn-secondary"
+            type="button"
+            onClick={handleLoadSimulationData}
+            title="Isi produk & contoh transaksi 7 hari untuk pengujian grafik"
+          >
+            <PackageCheck size={15} />
+            Isi Data Simulasi
+          </button>
           {isAdmin && (
-            <button className="btn-secondary" type="button" onClick={handleResetData} title="Reset seluruh data demo">
+            <button className="btn-secondary" type="button" onClick={handleResetData} title="Reset seluruh data demo ke 0">
               <Plus size={15} />
               Reset data
             </button>
@@ -353,9 +381,9 @@ export default function Dashboard() {
           <div style={{ width: '100%', height: 210 }}>
             {totalTransactionsCount === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center p-6 border border-dashed border-slate-700 rounded-2xl">
-                <BarChart3 size={32} className="text-slate-600 mb-2" />
+                <BarChart3 size={32} className="text-[#94a3b8] mb-2" />
                 <span className="font-semibold text-slate-300">Belum ada data transaksi pada periode ini</span>
-                <span className="text-[11px] text-slate-500 mt-1">Lakukan transaksi di Kasir (POS) untuk melihat grafik pendapatan</span>
+                <span className="text-[11px] text-[#94a3b8] mt-1">Lakukan transaksi di Kasir (POS) untuk melihat grafik pendapatan</span>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -471,7 +499,7 @@ export default function Dashboard() {
             {paymentMix.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center p-4">
                 <span className="font-semibold text-slate-300">Belum ada data pembayaran</span>
-                <span className="text-[11px] text-slate-500 mt-1">Grafik akan otomatis terisi saat ada transaksi kasir</span>
+                <span className="text-[11px] text-[#94a3b8] mt-1">Grafik akan otomatis terisi saat ada transaksi kasir</span>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -501,7 +529,7 @@ export default function Dashboard() {
             {categoryMix.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs text-center p-4">
                 <span className="font-semibold text-slate-300">Belum ada kategori terjual</span>
-                <span className="text-[11px] text-slate-500 mt-1">Diagram lingkaran akan terbentuk setelah transaksi pertama</span>
+                <span className="text-[11px] text-[#94a3b8] mt-1">Diagram lingkaran akan terbentuk setelah transaksi pertama</span>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">

@@ -5,14 +5,24 @@ import Link from 'next/link';
 import { Minus, Plus, Search, ShoppingCart, Trash2, ShieldCheck, MessageCircle, Clock, Users, QrCode, Printer, Scan, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import { formatRupiah } from '../utils/formatCurrency';
 import {
+  ensureInitialCatalog,
   normalizeNonNegativeNumber,
   normalizeProduct,
   normalizeTransaction,
   readStoredArray,
+  seedStarterProducts,
   writeStoredArray,
 } from '../utils/storage';
 
 const categories = ['Semua', 'Makanan', 'Minuman', 'Cemilan', 'Lainnya'];
+
+const snapshotCartItem = (item) => ({
+  id: item.id,
+  name: item.name,
+  price: item.price,
+  cost: normalizeNonNegativeNumber(item.cost),
+  qty: item.qty,
+});
 
 const formatProductName = (name) => {
   if (!name) return '';
@@ -37,12 +47,12 @@ export default function POSPage() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   // Advanced POS Features
+  const [currentUser, setCurrentUser] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [includeTax, setIncludeTax] = useState(true);
   const [includeService, setIncludeService] = useState(false);
   const [receiptWidth, setReceiptWidth] = useState('80mm');
-  const [showEscPosModal, setShowEscPosModal] = useState(false);
   const [showScannerModal, setShowScannerModal] = useState(false);
   const [scannerCode, setScannerCode] = useState('');
 
@@ -56,11 +66,7 @@ export default function POSPage() {
   const [startingCashInput, setStartingCashInput] = useState('100000');
   const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
   const [actualCashInput, setActualCashInput] = useState('');
-
-  // Manager PIN States
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [pinInput, setPinInput] = useState('');
-  const [pendingAction, setPendingAction] = useState(null);
+  const [shiftReport, setShiftReport] = useState(null);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -68,8 +74,28 @@ export default function POSPage() {
   };
 
   useEffect(() => {
-    setProducts(readStoredArray('products').map(normalizeProduct));
-    setCustomers(readStoredArray('zenith_customers'));
+    const savedAuth = localStorage.getItem('zenith_auth_user');
+    if (savedAuth) {
+      try {
+        setCurrentUser(JSON.parse(savedAuth));
+      } catch {
+        setCurrentUser(null);
+      }
+    }
+
+    setProducts(ensureInitialCatalog());
+    const storedCusts = readStoredArray('zenith_customers');
+    if (storedCusts.length === 0) {
+      const defaults = [
+        { id: 'CUST-1', name: 'Budi Santoso', phone: '081234567890', email: 'budi@gmail.com', points: 150, tier: 'Gold', totalSpent: 1250000 },
+        { id: 'CUST-2', name: 'Siti Aminah', phone: '081987654321', email: 'siti@yahoo.com', points: 80, tier: 'Silver', totalSpent: 650000 },
+        { id: 'CUST-3', name: 'Ahmad Fauzi', phone: '085611223344', email: 'fauzi@gmail.com', points: 20, tier: 'Bronze', totalSpent: 180000 },
+      ];
+      writeStoredArray('zenith_customers', defaults);
+      setCustomers(defaults);
+    } else {
+      setCustomers(storedCusts);
+    }
     const savedTheme = localStorage.getItem('zenith_pos_theme');
     setThemeMode(savedTheme || 'dark');
 
@@ -117,6 +143,7 @@ export default function POSPage() {
       cashSales: 0,
       nonCashSales: 0,
       transactionsCount: 0,
+      returnsTotal: 0,
     };
     localStorage.setItem('zenith_active_shift', JSON.stringify(shift));
     setActiveShift(shift);
@@ -137,6 +164,7 @@ export default function POSPage() {
       actualCash,
       expectedCash,
       difference,
+      returnsTotal: activeShift.returnsTotal || 0,
     };
 
     const history = readStoredArray('shift_history');
@@ -144,8 +172,9 @@ export default function POSPage() {
     localStorage.removeItem('zenith_active_shift');
     setActiveShift(null);
     setShowCloseShiftModal(false);
-    setShowShiftModal(true);
-    showToast('Shift kasir berhasil ditutup dan direkap.');
+    setActualCashInput('');
+    setShiftReport(closedShift);
+    showToast('Shift kasir berhasil ditutup. Laporan siap dicetak.');
   };
 
   const filteredProducts = useMemo(() => {
@@ -157,7 +186,7 @@ export default function POSPage() {
   }, [products, searchQuery, selectedCategory]);
 
   const selectedCustomer = useMemo(() => {
-    return customers.find(c => c.id === selectedCustomerId) || null;
+    return customers.find(c => String(c.id) === String(selectedCustomerId)) || null;
   }, [customers, selectedCustomerId]);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
@@ -213,7 +242,8 @@ export default function POSPage() {
 
   const handleScannerSubmit = (e) => {
     e.preventDefault();
-    const found = products.find(p => p.name.toLowerCase().includes(scannerCode.toLowerCase()) || p.id === scannerCode);
+    const q = scannerCode.trim().toLowerCase();
+    const found = products.find(p => p.name.toLowerCase().includes(q) || String(p.id).toLowerCase() === q);
     if (found) {
       addToCart(found);
       setScannerCode('');
@@ -265,6 +295,7 @@ export default function POSPage() {
       id: transactionId,
       date: dateStr,
       createdAt: now.toISOString(),
+      cashier: currentUser?.username || 'Kasir Staff',
       payment: 'QRIS (Dynamic Gateway)',
       subtotal,
       taxAmount,
@@ -274,12 +305,10 @@ export default function POSPage() {
       customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
       cashReceived: null,
       change: null,
-      items: activeQrisOrder.items.map((item) => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        qty: item.qty,
-      })),
+      status: 'Lunas',
+      paidAt: dateStr,
+      shiftId: activeShift?.id || null,
+      items: activeQrisOrder.items.map(snapshotCartItem),
     });
 
     const nextTransactions = [transaction, ...readStoredArray('transactions')];
@@ -338,6 +367,7 @@ export default function POSPage() {
       serviceAmount,
       discountAmount,
       customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
+      customerPhone: selectedCustomer ? selectedCustomer.phone : '',
       cashReceived: null,
       change: null,
       cartItems: transaction.items,
@@ -348,6 +378,46 @@ export default function POSPage() {
     setSelectedCustomerId('');
     setPaymentMethod('QRIS');
     showToast('Pembayaran QRIS Berhasil & Lunas via Webhook Simulator!');
+  };
+
+  const handleSaveQrisPending = () => {
+    if (!activeQrisOrder) return;
+    const now = new Date();
+    const transactionId = `TRX-${now.getTime()}`;
+    const dateStr = now.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }) + ' ' + now.toTimeString().slice(0, 5);
+
+    const transaction = normalizeTransaction({
+      id: transactionId,
+      date: dateStr,
+      createdAt: now.toISOString(),
+      cashier: currentUser?.username || 'Kasir Staff',
+      payment: 'QRIS (Dynamic Gateway)',
+      subtotal,
+      taxAmount,
+      serviceAmount,
+      discountAmount,
+      total: activeQrisOrder.amount,
+      customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
+      cashReceived: null,
+      change: null,
+      status: 'Menunggu',
+      paidAt: null,
+      shiftId: activeShift?.id || null,
+      items: activeQrisOrder.items.map(snapshotCartItem),
+    });
+
+    const nextTransactions = [transaction, ...readStoredArray('transactions')];
+    writeStoredArray('transactions', nextTransactions);
+
+    setCart([]);
+    setActiveQrisOrder(null);
+    setSelectedCustomerId('');
+    setPaymentMethod('QRIS');
+    showToast('Transaksi QRIS disimpan (Status: Menunggu Verifikasi Admin).');
   };
 
   const handleCheckout = () => {
@@ -389,6 +459,7 @@ export default function POSPage() {
       id: transactionId,
       date: dateStr,
       createdAt: now.toISOString(),
+      cashier: currentUser?.username || 'Kasir Staff',
       payment: paymentMethod,
       subtotal,
       taxAmount,
@@ -398,12 +469,10 @@ export default function POSPage() {
       customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
       cashReceived: paymentMethod === 'Tunai' ? cashAmount : null,
       change: paymentMethod === 'Tunai' ? change : null,
-      items: cart.map((item) => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        qty: item.qty,
-      })),
+      status: 'Lunas',
+      paidAt: dateStr,
+      shiftId: activeShift?.id || null,
+      items: cart.map(snapshotCartItem),
     });
 
     const nextTransactions = [transaction, ...readStoredArray('transactions')];
@@ -464,6 +533,7 @@ export default function POSPage() {
       serviceAmount,
       discountAmount,
       customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
+      customerPhone: selectedCustomer ? selectedCustomer.phone : '',
       cashReceived: transaction.cashReceived,
       change: transaction.change,
       cartItems: transaction.items,
@@ -478,6 +548,41 @@ export default function POSPage() {
 
   const handlePrintReceipt = () => {
     window.print();
+  };
+
+  const handleShareWhatsApp = () => {
+    if (!receiptData) return;
+    const itemLines = (receiptData.cartItems || [])
+      .map((item) => `- ${formatProductName(item.name)} (${item.qty}x @ ${formatRupiah(item.price)}) = ${formatRupiah(item.price * item.qty)}`)
+      .join('\n');
+
+    const lines = [
+      '*STRUK DIGITAL - ZENITH POS*',
+      `No. Trx: ${receiptData.id}`,
+      `Waktu: ${receiptData.date}`,
+      `Pelanggan: ${receiptData.customerName}`,
+      `Metode: ${receiptData.payment}`,
+      '--------------------------------',
+      itemLines,
+      '--------------------------------',
+      `Subtotal: ${formatRupiah(receiptData.subtotal)}`,
+      ...(receiptData.taxAmount > 0 ? [`PPN 11%: ${formatRupiah(receiptData.taxAmount)}`] : []),
+      ...(receiptData.serviceAmount > 0 ? [`Service 5%: ${formatRupiah(receiptData.serviceAmount)}`] : []),
+      ...(receiptData.discountAmount > 0 ? [`Diskon Member: -${formatRupiah(receiptData.discountAmount)}`] : []),
+      `*TOTAL: ${formatRupiah(receiptData.total)}*`,
+      ...(receiptData.payment === 'Tunai' && receiptData.change !== null ? [`Kembalian: ${formatRupiah(receiptData.change)}`] : []),
+      '',
+      'Terima kasih telah berbelanja di toko kami!',
+    ];
+
+    const encodedText = encodeURIComponent(lines.join('\n'));
+    const rawPhone = String(receiptData.customerPhone || '').replace(/\D/g, '');
+    const normalizedPhone = rawPhone.startsWith('0') ? `62${rawPhone.slice(1)}` : rawPhone;
+    const waUrl = normalizedPhone
+      ? `https://wa.me/${normalizedPhone}?text=${encodedText}`
+      : `https://wa.me/?text=${encodedText}`;
+
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -569,6 +674,52 @@ export default function POSPage() {
         </div>
       )}
 
+      {shiftReport && (
+        <div className="modal-backdrop print:p-0 print:bg-white print:static">
+          <div id="shift-report" className="modal-card shift-print-sheet" style={{ maxWidth: '440px' }}>
+            <div className="modal-header print:hidden">
+              <div>
+                <span className="eyebrow" style={{ color: 'var(--accent-primary)' }}>Laporan Tutup Shift</span>
+                <h3>Rekap Kasir</h3>
+              </div>
+            </div>
+            <div style={{ fontFamily: 'monospace', fontSize: '0.82rem', display: 'grid', gap: '8px' }}>
+              <p style={{ margin: 0, fontWeight: 800, textAlign: 'center' }}>ZENITH POS — LAPORAN SHIFT</p>
+              <p style={{ margin: 0, textAlign: 'center', color: 'var(--text-secondary)' }}>{shiftReport.id}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Mulai</span><span>{shiftReport.startTime}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Selesai</span><span>{shiftReport.endTime}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Modal awal</span><span>{formatRupiah(shiftReport.startingCash || 0)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Penjualan tunai</span><span>{formatRupiah(shiftReport.cashSales || 0)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Penjualan non-tunai</span><span>{formatRupiah(shiftReport.nonCashSales || 0)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Jumlah transaksi</span><span>{shiftReport.transactionsCount || 0}x</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total retur</span><span>{formatRupiah(shiftReport.returnsTotal || 0)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-default)', paddingTop: '8px' }}><span>Kas diharapkan</span><span>{formatRupiah(shiftReport.expectedCash || 0)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Kas aktual</span><span>{formatRupiah(shiftReport.actualCash || 0)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
+                <span>Selisih</span>
+                <span>{formatRupiah(shiftReport.difference || 0)} ({(shiftReport.difference || 0) === 0 ? 'sesuai' : (shiftReport.difference || 0) > 0 ? 'lebih' : 'kurang'})</span>
+              </div>
+            </div>
+            <div className="modal-actions print:hidden" style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
+              <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => window.print()}>
+                <Printer size={15} /> Cetak Laporan
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  setShiftReport(null);
+                  setShowShiftModal(true);
+                }}
+              >
+                Shift Baru
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Barcode Scanner Modal */}
       {showScannerModal && (
         <div className="modal-backdrop">
@@ -606,10 +757,12 @@ export default function POSPage() {
       {activeQrisOrder && (
         <div className="modal-backdrop">
           <div className="modal-card" style={{ maxWidth: '440px', textAlign: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <span className="eyebrow" style={{ color: 'var(--accent-primary)' }}>Midtrans / Xendit Sandbox</span>
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300">
-                {Math.floor(qrisTimer / 60)}:{String(qrisTimer % 60).padStart(2, '0')}
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${activeQrisOrder.status === 'EXPIRED' ? 'bg-rose-500/20 text-rose-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                {activeQrisOrder.status === 'EXPIRED'
+                  ? 'KADALUARSA'
+                  : `${Math.floor(qrisTimer / 60)}:${String(qrisTimer % 60).padStart(2, '0')}`}
               </span>
             </div>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '4px' }}>Scan QRIS Dinamis</h3>
@@ -617,9 +770,9 @@ export default function POSPage() {
               ID Transaksi: <span style={{ fontFamily: 'monospace', color: 'var(--accent-secondary)' }}>{activeQrisOrder.id}</span>
             </p>
 
-            <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', display: 'inline-block', marginBottom: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }}>
+            <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', display: 'inline-block', marginBottom: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)', opacity: activeQrisOrder.status === 'EXPIRED' ? 0.5 : 1 }}>
               <div style={{ width: '180px', height: '180px', border: '4px solid #0f172a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: '10px', margin: '0 auto' }}>
-                <QrCode size={110} className="text-slate-900" />
+                <QrCode size={110} className="text-[#f0fdf4]" />
                 <span style={{ fontSize: '9px', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>STANDAR QRIS</span>
               </div>
             </div>
@@ -630,13 +783,35 @@ export default function POSPage() {
             </div>
 
             <div style={{ display: 'grid', gap: '8px' }}>
+              {activeQrisOrder.status === 'EXPIRED' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQrisTimer(300);
+                    setActiveQrisOrder((curr) => curr ? { ...curr, status: 'PENDING' } : null);
+                  }}
+                  className="btn-primary"
+                  style={{ width: '100%' }}
+                >
+                  Perbarui Kode QRIS (Reset 5 Menit)
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSimulateQrisPaid}
+                  className="btn-primary"
+                  style={{ width: '100%', background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                >
+                  Simulasi Pembayaran Berhasil (Webhook)
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleSimulateQrisPaid}
-                className="btn-primary"
-                style={{ width: '100%', background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                onClick={handleSaveQrisPending}
+                className="btn-secondary"
+                style={{ width: '100%', borderColor: 'rgba(251, 191, 36, 0.4)', color: 'var(--warning)' }}
               >
-                Simulasi Pembayaran Berhasil (Webhook)
+                Simpan Menunggu Verifikasi Admin
               </button>
               <button
                 type="button"
@@ -652,7 +827,7 @@ export default function POSPage() {
       )}
 
       {/* Left Catalog Section */}
-      <section className="pos-catalog">
+      <section className="pos-catalog print:hidden">
         <div className="catalog-header">
           <div>
             <span className="eyebrow">Pilih Produk &amp; Menu</span>
@@ -709,7 +884,27 @@ export default function POSPage() {
         <div className="products-grid">
           {filteredProducts.length === 0 ? (
             <div className="empty-state" style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <p>Tidak ada produk yang sesuai dengan pencarian.</p>
+              {products.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                  <p style={{ margin: 0, fontWeight: 700, color: 'var(--text-primary)' }}>Katalog produk masih kosong (0 produk).</p>
+                  <p style={{ margin: 0, fontSize: '0.8rem' }}>Muat katalog produk standar UMKM secara instan untuk langsung mulai bertransaksi di kasir.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const seeded = seedStarterProducts();
+                      setProducts(seeded);
+                      showToast('12 Produk katalog standar UMKM berhasil dimuat!');
+                    }}
+                    className="btn-primary"
+                    style={{ marginTop: '4px' }}
+                  >
+                    <Plus size={15} />
+                    <span>Muat Katalog Produk Standar (12 Item)</span>
+                  </button>
+                </div>
+              ) : (
+                <p>Tidak ada produk yang sesuai dengan pencarian.</p>
+              )}
             </div>
           ) : (
             filteredProducts.map((product) => {
@@ -745,7 +940,7 @@ export default function POSPage() {
       </section>
 
       {/* Right Cart & Checkout Section */}
-      <aside className="pos-cart">
+      <aside className="pos-cart print:hidden">
         <div className="cart-head">
           <div className="flex items-center space-x-2">
             <ShoppingCart size={18} color="var(--accent-secondary)" />
@@ -840,7 +1035,7 @@ export default function POSPage() {
                 type="checkbox"
                 checked={includeTax}
                 onChange={(e) => setIncludeTax(e.target.checked)}
-                className="rounded text-emerald-600 focus:ring-emerald-500"
+                className="rounded text-emerald-300 focus:ring-emerald-500"
               />
               <span className="font-semibold text-[var(--text-secondary)]">PPN (11%)</span>
             </label>
@@ -849,7 +1044,7 @@ export default function POSPage() {
                 type="checkbox"
                 checked={includeService}
                 onChange={(e) => setIncludeService(e.target.checked)}
-                className="rounded text-emerald-600 focus:ring-emerald-500"
+                className="rounded text-emerald-300 focus:ring-emerald-500"
               />
               <span className="font-semibold text-[var(--text-secondary)]">Service (5%)</span>
             </label>
@@ -917,7 +1112,7 @@ export default function POSPage() {
 
       {showReceiptModal && receiptData && (
         <div className="modal-backdrop print:p-0 print:bg-white print:static">
-          <div className="modal-card print:shadow-none print:border-none print:w-full print:max-w-none" style={{ fontFamily: 'monospace', maxWidth: receiptWidth === '58mm' ? '320px' : '440px' }}>
+          <div className="modal-card shift-print-sheet print:shadow-none print:border-none print:w-full print:max-w-none" style={{ fontFamily: 'monospace', maxWidth: receiptWidth === '58mm' ? '320px' : '440px' }}>
             <div className="flex justify-between items-center pb-3 border-b border-slate-700 mb-3 print:hidden">
               <span className="text-xs font-bold text-slate-400">Pengaturan Struk Thermal</span>
               <div className="flex space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-700 text-xs">
@@ -1012,14 +1207,27 @@ export default function POSPage() {
 
               <div style={{ textAlign: 'center', paddingTop: '4px', display: 'grid', gap: '2px' }}>
                 <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>TERIMA KASIH TELAH BERBELANJA</p>
-                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: 0 }}>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.</p>
+                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: 0 }}>Retur barang dapat diproses dari menu Riwayat Transaksi.</p>
               </div>
             </div>
 
             <div style={{ marginTop: '20px', paddingTop: '14px', borderTop: '1px solid var(--border-default)', display: 'grid', gap: '10px' }} className="print:hidden">
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button type="button" onClick={() => setShowReceiptModal(false)} className="btn-secondary" style={{ flex: 1 }}>Tutup</button>
-                <button type="button" onClick={handlePrintReceipt} className="btn-primary" style={{ flex: 1 }}>Cetak (PDF)</button>
+                <button
+                  type="button"
+                  onClick={handleShareWhatsApp}
+                  className="btn-secondary"
+                  style={{ flex: 1, borderColor: 'rgba(52, 211, 153, 0.4)', color: 'var(--success)' }}
+                  title="Kirim Struk Digital ke WhatsApp Pelanggan"
+                >
+                  <MessageCircle size={15} />
+                  <span>Kirim WA</span>
+                </button>
+                <button type="button" onClick={handlePrintReceipt} className="btn-primary" style={{ flex: 1 }}>
+                  <Printer size={15} />
+                  <span>Cetak (PDF)</span>
+                </button>
               </div>
             </div>
           </div>

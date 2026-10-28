@@ -186,7 +186,7 @@ export default function CustomersPage() {
 
       {/* Add / Edit Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-[#090c0b]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0B1222] border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl">
             <h3 className="text-lg font-bold text-white mb-1">
               {editingCustomer ? 'Edit Pelanggan' : 'Tambah Pelanggan Baru'}

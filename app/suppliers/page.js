@@ -82,15 +82,16 @@ export default function SuppliersPage() {
       showToast('Pilih supplier dan produk terlebih dahulu!');
       return;
     }
-    const qty = Math.max(1, parseInt(poQty) || 1);
-    const supplier = suppliers.find(s => s.id === selectedSupplierId);
-    const product = products.find(p => p.id === selectedProductId);
+    const qty = Math.max(1, parseInt(poQty, 10) || 1);
+    const supplier = suppliers.find(s => String(s.id) === String(selectedSupplierId));
+    const product = products.find(p => String(p.id) === String(selectedProductId));
 
     if (!supplier || !product) {
       showToast('Data supplier atau produk tidak valid.');
       return;
     }
 
+    const unitCost = normalizeNonNegativeNumber(product.cost) || Math.round(product.price * 0.7);
     const newPo = {
       id: `PO-${Date.now()}`,
       date: new Date().toLocaleDateString('id-ID'),
@@ -98,7 +99,7 @@ export default function SuppliersPage() {
       productName: product.name,
       productId: product.id,
       qty,
-      estimatedCost: product.price * 0.7 * qty, // Estimasi modal 70% dari harga jual
+      estimatedCost: unitCost * qty,
       status: 'Pending',
       notes: poNotes.trim() || 'Restock rutin',
     };
@@ -115,21 +116,21 @@ export default function SuppliersPage() {
   };
 
   const handleReceivePo = (poId) => {
-    const po = purchaseOrders.find(p => p.id === poId);
+    const po = purchaseOrders.find(p => String(p.id) === String(poId));
     if (!po || po.status === 'Diterima') return;
 
     // Update stock in products
     const currentProducts = readStoredArray('products').map(normalizeProduct);
     const updatedProducts = currentProducts.map(p => {
-      if (p.id === po.productId) {
-        return { ...p, stock: p.stock + po.qty };
+      if (String(p.id) === String(po.productId) || p.name === po.productName) {
+        return { ...p, stock: Number(p.stock || 0) + Number(po.qty || 0) };
       }
       return p;
     });
     setProducts(updatedProducts);
     writeStoredArray('products', updatedProducts);
 
-    const updatedPo = purchaseOrders.map(p => p.id === poId ? { ...p, status: 'Diterima' } : p);
+    const updatedPo = purchaseOrders.map(p => String(p.id) === String(poId) ? { ...p, status: 'Diterima' } : p);
     setPurchaseOrders(updatedPo);
     writeStoredArray('zenith_purchase_orders', updatedPo);
     showToast(`PO #${poId} diterima! Stok produk "${po.productName}" bertambah +${po.qty}.`);
@@ -180,7 +181,7 @@ export default function SuppliersPage() {
                   <h4 className="font-bold text-white text-sm">{s.name}</h4>
                 </div>
                 <p className="text-xs text-slate-400 pl-10">Kontak: <span className="text-slate-200 font-semibold">{s.contact}</span> ({s.phone})</p>
-                <p className="text-xs text-slate-500 pl-10">{s.address}</p>
+                <p className="text-xs text-[#94a3b8] pl-10">{s.address}</p>
               </div>
             </div>
           ))}
@@ -209,7 +210,7 @@ export default function SuppliersPage() {
                 {purchaseOrders.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="text-center py-10 text-slate-400">
-                      Belum ada Purchase Order (PO) yang dibuat. Klik tombol "Buat Purchase Order" di atas.
+                      Belum ada Purchase Order (PO) yang dibuat. Klik tombol &ldquo;Buat Purchase Order&rdquo; di atas.
                     </td>
                   </tr>
                 ) : (
@@ -254,7 +255,7 @@ export default function SuppliersPage() {
 
       {/* Add Supplier Modal */}
       {showSupplierModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-[#090c0b]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0B1222] border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl">
             <h3 className="text-lg font-bold text-white mb-1">Tambah Supplier Baru</h3>
             <p className="text-xs text-slate-400 mb-5">Masukkan informasi vendor pemasok produk.</p>
@@ -323,7 +324,7 @@ export default function SuppliersPage() {
 
       {/* Create PO Modal */}
       {showPoModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-[#090c0b]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0B1222] border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl">
             <h3 className="text-lg font-bold text-white mb-1">Buat Purchase Order (PO)</h3>
             <p className="text-xs text-slate-400 mb-5">Pesan stok barang ke supplier terdaftar.</p>
