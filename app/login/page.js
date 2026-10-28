@@ -62,28 +62,45 @@ export default function LoginPage() {
     }
   };
 
+  const handleQuickDemoLogin = (demoUsername, demoPassword, demoRole, demoDisplayName) => {
+    setUsername(demoUsername);
+    setPassword(demoPassword);
+    setError('');
+    const authUser = {
+      username: demoDisplayName,
+      role: demoRole,
+    };
+    localStorage.setItem('zenith_auth_user', JSON.stringify(authUser));
+    window.dispatchEvent(new Event('zenith_auth_update'));
+    if (demoRole === 'kasir') {
+      router.push('/pos');
+    } else {
+      router.push('/');
+    }
+  };
+
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-8 md:p-10">
+      <div className="bg-[#121816] rounded-2xl shadow-xl border border-[#1e2a26] max-w-md w-full p-8 md:p-10">
         <div className="flex items-center space-x-3 mb-8">
           <div className="w-12 h-12 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-emerald-600/30">
             Z
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Login Zenith POS</h1>
-            <p className="text-xs text-slate-500 font-medium">Masukkan credential yang valid untuk masuk</p>
+            <h1 className="text-2xl font-bold text-[#f0fdf4] tracking-tight">Login Zenith POS</h1>
+            <p className="text-xs text-[#94a3b8] font-medium">Masukkan credential yang valid untuk masuk</p>
           </div>
         </div>
 
         {error && (
-          <div className="mb-6 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold">
+          <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs font-semibold">
             {error}
           </div>
         )}
 
         <form onSubmit={handleLoginSubmit} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-bold text-[#f0fdf4] uppercase tracking-wider mb-2">
               Username
             </label>
             <input
@@ -93,12 +110,12 @@ export default function LoginPage() {
               placeholder="Contoh: kasir atau management"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50 font-medium text-slate-900 transition"
+              className="w-full px-4 py-3 rounded-xl border border-[#1e2a26] text-sm focus:outline-none focus:border-emerald-600 bg-[#0a0e0d] font-medium text-[#f0fdf4] transition"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-bold text-[#f0fdf4] uppercase tracking-wider mb-2">
               Password
             </label>
             <input
@@ -108,23 +125,33 @@ export default function LoginPage() {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-600 bg-slate-50 font-medium text-slate-900 transition"
+              className="w-full px-4 py-3 rounded-xl border border-[#1e2a26] text-sm focus:outline-none focus:border-emerald-600 bg-[#0a0e0d] font-medium text-[#f0fdf4] transition"
             />
           </div>
 
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-600 space-y-1.5">
-            <p className="font-bold text-slate-900 flex items-center space-x-1.5">
-              <Key size={14} className="text-emerald-600" />
-              <span>Demo Credentials:</span>
+          <div className="p-4 bg-[#0a0e0d] rounded-xl border border-[#1e2a26]/80 text-xs text-[#94a3b8] space-y-2">
+            <p className="font-bold text-[#f0fdf4] flex items-center justify-between">
+              <span className="flex items-center space-x-1.5">
+                <Key size={14} className="text-emerald-300" />
+                <span>Demo Credentials (Klik untuk Masuk Instan):</span>
+              </span>
             </p>
-            <div className="flex justify-between items-center bg-white p-2 rounded border border-slate-200">
-              <span className="font-medium text-slate-700">Kasir:</span>
-              <code className="font-mono text-emerald-600 font-bold">kasir / kasir123</code>
-            </div>
-            <div className="flex justify-between items-center bg-white p-2 rounded border border-slate-200">
-              <span className="font-medium text-slate-700">Management:</span>
-              <code className="font-mono text-emerald-600 font-bold">management / admin123</code>
-            </div>
+            <button
+              type="button"
+              onClick={() => handleQuickDemoLogin('kasir', 'kasir123', 'kasir', 'Kasir Staff')}
+              className="w-full flex justify-between items-center bg-[#121816] hover:bg-emerald-500/15 p-2.5 rounded-lg border border-[#1e2a26] hover:border-emerald-500 transition text-left group"
+            >
+              <span className="font-semibold text-[#f0fdf4] group-hover:text-emerald-300">Masuk sebagai Kasir:</span>
+              <code className="font-mono text-emerald-300 font-bold">kasir / kasir123 &rarr;</code>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickDemoLogin('management', 'admin123', 'management', 'Management Admin')}
+              className="w-full flex justify-between items-center bg-[#121816] hover:bg-emerald-500/15 p-2.5 rounded-lg border border-[#1e2a26] hover:border-emerald-500 transition text-left group"
+            >
+              <span className="font-semibold text-[#f0fdf4] group-hover:text-emerald-300">Masuk sebagai Admin:</span>
+              <code className="font-mono text-emerald-300 font-bold">management / admin123 &rarr;</code>
+            </button>
           </div>
 
           <button
@@ -140,9 +167,9 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-          <Link href="/" className="text-xs font-semibold text-slate-600 hover:text-emerald-600 transition">
-            &larr; Kembali ke Dashboard Publik
+        <div className="mt-8 pt-6 border-t border-[#1e2a26] text-center">
+          <Link href="/welcome" className="text-xs font-semibold text-[#94a3b8] hover:text-emerald-300 transition">
+            &larr; Kembali ke Halaman Beranda
           </Link>
         </div>
       </div>

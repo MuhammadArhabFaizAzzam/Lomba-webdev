@@ -19,9 +19,10 @@ import {
   AlertTriangle,
   Bell,
   Users,
-  Truck
+  Truck,
+  ChefHat,
 } from 'lucide-react';
-import { readStoredArray, normalizeProduct } from './utils/storage';
+import { readStoredArray, normalizeProduct, LOW_STOCK_MAX } from './utils/storage';
 
 export default function ClientLayout({ children }) {
   const pathname = usePathname();
@@ -59,7 +60,7 @@ export default function ClientLayout({ children }) {
   const updateLowStockCount = () => {
     try {
       const products = readStoredArray('products').map(normalizeProduct);
-      const low = products.filter(p => p.stock <= 20).length;
+      const low = products.filter(p => Number(p.stock || 0) <= LOW_STOCK_MAX).length;
       setLowStockCount(low);
     } catch (e) {
       setLowStockCount(0);
@@ -67,6 +68,9 @@ export default function ClientLayout({ children }) {
   };
 
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7682/ingest/ca64648d-ea64-4da8-a11d-7f73285073ae',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'268840'},body:JSON.stringify({sessionId:'268840',runId:'pre-fix',hypothesisId:'A-D',location:'ClientLayout.js:mount',message:'page boot',data:{href:window.location.href,path:window.location.pathname,nextPath:pathname,title:document.title,text:document.body?.innerText?.slice(0,180)||''},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     syncAuth();
     updateLowStockCount();
 
@@ -76,10 +80,12 @@ export default function ClientLayout({ children }) {
     };
 
     window.addEventListener('zenith_auth_update', handleAuthUpdate);
+    window.addEventListener('zenith_data_update', updateLowStockCount);
     window.addEventListener('storage', handleAuthUpdate);
 
     return () => {
       window.removeEventListener('zenith_auth_update', handleAuthUpdate);
+      window.removeEventListener('zenith_data_update', updateLowStockCount);
       window.removeEventListener('storage', handleAuthUpdate);
     };
   }, []);
@@ -95,8 +101,8 @@ export default function ClientLayout({ children }) {
     if (!isInitialized) return;
 
     const freshUser = syncAuth();
-    const protectedPaths = ['/pos', '/transactions', '/inventory', '/guide'];
-    const guestOnlyPaths = ['/welcome', '/login'];
+    const protectedPaths = ['/pos', '/transactions', '/inventory', '/guide', '/customers', '/suppliers', '/kds'];
+    const guestOnlyPaths = ['/login'];
 
     if (pathname === '/') {
       if (!freshUser) {
@@ -123,7 +129,7 @@ export default function ClientLayout({ children }) {
     if (freshUser && freshUser.role === 'kasir') {
       const kasirAllowed = ['/', '/welcome', '/pos', '/transactions'];
       if (!kasirAllowed.includes(pathname)) {
-        showToast('Akses Ditolak! Kasir tidak memiliki izin untuk mengakses Manajemen Stok atau Panduan.');
+        showToast('Akses Ditolak! Kasir hanya dapat membuka kasir, riwayat transaksi, dan dashboard.');
         router.push('/pos');
       }
     }
@@ -169,6 +175,12 @@ export default function ClientLayout({ children }) {
               href: '/pos',
               icon: ShoppingCart,
               description: 'Transaksi cepat & cetak struk',
+            },
+            {
+              name: 'Layar Dapur (KDS)',
+              href: '/kds',
+              icon: ChefHat,
+              description: 'Status pesanan dari kasir',
             },
             {
               name: 'Manajemen Stok',
@@ -254,7 +266,7 @@ export default function ClientLayout({ children }) {
 
   if (!user && (pathname === '/welcome' || pathname === '/login')) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans relative">
+      <div className="min-h-screen bg-[#0a0e0d] text-[#f0fdf4] flex flex-col font-sans relative">
         {toastMessage && (
           <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce flex items-center space-x-2">
             <Bell size={16} className="text-amber-400" />
@@ -267,7 +279,7 @@ export default function ClientLayout({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col md:flex-row font-sans relative">
+    <div className="min-h-screen bg-[#0a0e0d] text-[#f0fdf4] flex flex-col md:flex-row font-sans relative">
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce flex items-center space-x-2">
           <span>🔔</span>
@@ -276,7 +288,7 @@ export default function ClientLayout({ children }) {
       )}
 
       {/* Sidebar for Desktop */}
-      <aside className="hidden md:flex md:w-68 bg-[#090E1A] text-white flex-col shadow-2xl border-r border-slate-800/80 z-20 sticky top-0 h-screen overflow-y-auto select-none">
+      <aside className="hidden md:flex md:w-68 bg-[#090E1A] text-white flex-col shadow-2xl border-r border-slate-800/80 z-20 sticky top-0 h-screen overflow-y-auto select-none print:hidden">
         {/* Brand Header */}
         <div className="p-5 border-b border-slate-800/80 bg-[#0B1222]/60">
           <div className="flex items-center space-x-3">
@@ -378,7 +390,7 @@ export default function ClientLayout({ children }) {
       </aside>
 
       {/* Mobile Top Navigation */}
-      <div className="md:hidden bg-[#090E1A] text-white p-4 flex items-center justify-between shadow-md z-20 border-b border-slate-800">
+      <div className="md:hidden bg-[#090E1A] text-white p-4 flex items-center justify-between shadow-md z-20 border-b border-slate-800 print:hidden">
         <div className="flex items-center space-x-2.5">
           <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center font-bold text-white text-sm shadow-md">
             Z
@@ -449,16 +461,16 @@ export default function ClientLayout({ children }) {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-h-screen overflow-y-auto">
-        <header className="bg-white border-b border-slate-200 px-8 py-3.5 hidden md:flex items-center justify-between shadow-xs z-10 sticky top-0">
-          <div className="text-xs font-medium text-slate-600 flex items-center space-x-2">
+        <header className="bg-[#121816] border-b border-[#1e2a26] px-8 py-3.5 hidden md:flex items-center justify-between shadow-xs z-10 sticky top-0 print:hidden">
+          <div className="text-xs font-medium text-[#94a3b8] flex items-center space-x-2">
             <span>Sesi Aktif:</span>
             {user && (
               <>
-                <span className="font-bold text-slate-900">{user.username}</span>
+                <span className="font-bold text-[#f0fdf4]">{user.username}</span>
                 <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
                   user.role === 'management'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
                 }`}>
                   {user.role === 'management' ? 'Administrator' : 'Kasir'}
                 </span>
@@ -466,14 +478,14 @@ export default function ClientLayout({ children }) {
             )}
           </div>
           <div className="flex items-center space-x-4">
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
               <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
               Sistem Aktif & Terhubung
             </span>
             {user && (
               <button
                 onClick={handleLogout}
-                className="text-xs font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg transition"
+                className="text-xs font-semibold text-rose-300 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/15 px-3 py-1.5 rounded-lg transition"
               >
                 Keluar (Logout)
               </button>
@@ -481,7 +493,7 @@ export default function ClientLayout({ children }) {
           </div>
         </header>
 
-        <div className="flex-1 p-6 md:p-10 lg:p-12 max-w-7xl 2xl:max-w-[1700px] w-full mx-auto">
+        <div className="flex-1 p-6 md:p-10 lg:p-12 max-w-7xl 2xl:max-w-[1700px] w-full mx-auto print:p-0 print:max-w-none">
           {children}
         </div>
       </main>

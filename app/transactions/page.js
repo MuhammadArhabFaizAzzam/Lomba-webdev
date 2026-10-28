@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, ReceiptText, Search, WalletCards, Eye, Printer, CheckCircle2, Clock, AlertCircle, Filter } from 'lucide-react';
+import { ArrowRight, ReceiptText, Search, WalletCards, Eye, Printer, CheckCircle2, Clock, AlertCircle, Filter, Undo2 } from 'lucide-react';
 import { formatRupiah } from '../utils/formatCurrency';
 import { normalizeTransaction, normalizeProduct, readStoredArray, writeStoredArray } from '../utils/storage';
 
@@ -18,6 +18,8 @@ const formatProductName = (name) => {
 export default function TransactionsPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [shiftHistory, setShiftHistory] = useState([]);
+  const [activeTab, setActiveTab] = useState('transactions'); // 'transactions' | 'shifts'
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('Semua');
   const [statusFilter, setStatusFilter] = useState('Semua');
@@ -30,6 +32,8 @@ export default function TransactionsPage() {
   // Custom Confirm Modal State for Mark As Paid
   const [showConfirmMarkPaidModal, setShowConfirmMarkPaidModal] = useState(false);
   const [txToMarkPaid, setTxToMarkPaid] = useState(null);
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [txToReturn, setTxToReturn] = useState(null);
 
   const [toastMessage, setToastMessage] = useState('');
 
@@ -57,6 +61,7 @@ export default function TransactionsPage() {
         paidAt: tx.paidAt || (tx.status === 'Lunas' ? tx.date : null),
       }));
       setTransactions(enhanced);
+      setShiftHistory(readStoredArray('shift_history'));
     }, 0);
     return () => window.clearTimeout(loadTransactions);
   }, []);
@@ -100,6 +105,12 @@ export default function TransactionsPage() {
     const updatedTransactions = transactions.map(t => t.id === tx.id ? { ...t, status: 'Lunas', paidAt: paidTimestamp } : t);
     saveTransactions(updatedTransactions);
 
+    // Push to KDS if not already in kds_statuses
+    const kdsStatuses = readStoredArray('kds_statuses');
+    if (!kdsStatuses.some((entry) => entry.id === tx.id)) {
+      writeStoredArray('kds_statuses', [{ id: tx.id, status: 'PENDING' }, ...kdsStatuses]);
+    }
+
     showToast(`Transaksi ${tx.id} Lunas & Stok gudang berhasil dipotong!`);
     if (selectedTx && selectedTx.id === tx.id) {
       setSelectedTx(prev => ({ ...prev, status: 'Lunas', paidAt: paidTimestamp }));
@@ -107,6 +118,65 @@ export default function TransactionsPage() {
 
     setShowConfirmMarkPaidModal(false);
     setTxToMarkPaid(null);
+  };
+
+  const promptReturn = (tx, e) => {
+    if (e) e.stopPropagation();
+    setTxToReturn(tx);
+    setShowReturnModal(true);
+  };
+
+  const executeReturn = () => {
+    if (!txToReturn || txToReturn.status !== 'Lunas') return;
+    const tx = txToReturn;
+
+    const products = readStoredArray('products').map(normalizeProduct);
+    const items = Array.isArray(tx.items) ? tx.items : [];
+    const updatedProducts = products.map((prod) => {
+      const cartItem = items.find((item) => item.id === prod.id || item.name === prod.name);
+      if (!cartItem) return prod;
+      return { ...prod, stock: Number(prod.stock || 0) + Number(cartItem.qty || 0) };
+    });
+    writeStoredArray('products', updatedProducts);
+
+    const returnedAt = new Date().toLocaleString('id-ID');
+    const updatedTransactions = transactions.map((entry) => (
+      entry.id === tx.id ? { ...entry, status: 'Retur', returnedAt } : entry
+    ));
+    saveTransactions(updatedTransactions);
+
+    try {
+      const savedShift = localStorage.getItem('zenith_active_shift');
+      if (savedShift && tx.shiftId) {
+        const shift = JSON.parse(savedShift);
+        if (shift?.id === tx.shiftId) {
+          const amount = Number(tx.total || 0);
+          const isCash = String(tx.payment || '').toLowerCase().includes('tunai');
+          const updatedShift = {
+            ...shift,
+            cashSales: Math.max(0, Number(shift.cashSales || 0) - (isCash ? amount : 0)),
+            nonCashSales: Math.max(0, Number(shift.nonCashSales || 0) - (isCash ? 0 : amount)),
+            transactionsCount: Math.max(0, Number(shift.transactionsCount || 0) - 1),
+            returnsTotal: Number(shift.returnsTotal || 0) + amount,
+          };
+          localStorage.setItem('zenith_active_shift', JSON.stringify(updatedShift));
+        }
+      }
+    } catch {
+      // Shift tetap berjalan meskipun rekap kas gagal diperbarui.
+    }
+
+    const kdsStatuses = readStoredArray('kds_statuses');
+    writeStoredArray('kds_statuses', kdsStatuses.map((entry) => (
+      entry.id === tx.id ? { ...entry, status: 'COMPLETED' } : entry
+    )));
+
+    showToast(`Retur ${tx.id} berhasil. Stok dikembalikan ke gudang.`);
+    if (selectedTx && selectedTx.id === tx.id) {
+      setSelectedTx((prev) => ({ ...prev, status: 'Retur', returnedAt }));
+    }
+    setShowReturnModal(false);
+    setTxToReturn(null);
   };
 
   const filteredTransactions = useMemo(() => {
@@ -132,9 +202,10 @@ export default function TransactionsPage() {
   // Financial & Summary Metrics
   const summary = useMemo(() => {
     const todayStr = new Date().toDateString();
+    const billable = filteredTransactions.filter((tx) => tx.status !== 'Retur');
     const totalCount = filteredTransactions.length;
     
-    const totalRecorded = filteredTransactions.reduce((sum, tx) => sum + Number(tx.total || 0), 0);
+    const totalRecorded = billable.reduce((sum, tx) => sum + Number(tx.total || 0), 0);
     const totalPaid = filteredTransactions.filter(tx => tx.status === 'Lunas').reduce((sum, tx) => sum + Number(tx.total || 0), 0);
     const totalPending = filteredTransactions.filter(tx => tx.status === 'Menunggu').reduce((sum, tx) => sum + Number(tx.total || 0), 0);
 
@@ -203,6 +274,14 @@ export default function TransactionsPage() {
         </span>
       );
     }
+    if (status === 'Retur') {
+      return (
+        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-sky-500/10 text-sky-300 border border-sky-500/30 inline-flex items-center space-x-1">
+          <Undo2 size={12} />
+          <span>Retur</span>
+        </span>
+      );
+    }
     return (
       <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 inline-flex items-center space-x-1">
         <AlertCircle size={12} />
@@ -219,7 +298,7 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      <div className="page-heading">
+      <div className="page-heading print:hidden">
         <div>
           <span className="eyebrow">Finance log</span>
           <h2>Riwayat &amp; Status Transaksi</h2>
@@ -240,7 +319,7 @@ export default function TransactionsPage() {
       </div>
 
       {/* Summary Cards Above Table (Clickable as filters) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:hidden">
         <div
           onClick={() => { setStatusFilter('Semua'); setMethodFilter('Semua'); }}
           className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
@@ -286,8 +365,111 @@ export default function TransactionsPage() {
         </div>
       </div>
 
+      {/* Tab Switcher: Transaksi Penjualan vs Riwayat Shift Kasir */}
+      <div className="flex flex-wrap items-center gap-2 bg-slate-900/90 border border-slate-800 p-1.5 rounded-2xl w-fit print:hidden">
+        <button
+          type="button"
+          onClick={() => setActiveTab('transactions')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
+            activeTab === 'transactions'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <ReceiptText size={14} />
+          <span>Daftar Transaksi Penjualan ({transactions.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('shifts')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
+            activeTab === 'shifts'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Clock size={14} />
+          <span>Riwayat Rekonsiliasi Shift Kasir ({shiftHistory.length})</span>
+        </button>
+      </div>
+
+      {activeTab === 'shifts' ? (
+        <div className="data-panel print:hidden">
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ID Shift</th>
+                  <th>Waktu Buka &amp; Tutup</th>
+                  <th className="align-right">Modal Awal</th>
+                  <th className="align-right">Tunai / Non-Tunai</th>
+                  <th className="align-right">Total Retur</th>
+                  <th className="align-right">Ekspektasi Kas</th>
+                  <th className="align-right">Kas Aktual</th>
+                  <th className="align-center">Status Selisih</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shiftHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan="8">
+                      <div className="table-empty">
+                        <span className="empty-icon"><Clock size={22} /></span>
+                        <strong>Belum ada riwayat penutupan shift kasir</strong>
+                        <p>Rekap rekonsiliasi laci kasir akan tercatat otomatis setiap kali kasir menutup shift di halaman POS.</p>
+                        <Link href="/pos" className="btn-primary">Buka Kasir POS <ArrowRight size={15} /></Link>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  shiftHistory.map((sh) => {
+                    const diff = Number(sh.difference || 0);
+                    return (
+                      <tr key={sh.id} className="hover:bg-slate-800/40 transition">
+                        <td className="transaction-id font-mono text-emerald-400 font-bold">{sh.id}</td>
+                        <td className="text-xs">
+                          <div className="text-slate-200 font-semibold">Buka: {sh.startTime}</div>
+                          <div className="text-slate-400">Tutup: {sh.endTime || '-'}</div>
+                        </td>
+                        <td className="align-right font-mono text-slate-200">{formatRupiah(sh.startingCash || 0)}</td>
+                        <td className="align-right text-xs font-mono">
+                          <div className="text-emerald-400 font-bold">Tunai: {formatRupiah(sh.cashSales || 0)}</div>
+                          <div className="text-slate-400">Non-Tunai: {formatRupiah(sh.nonCashSales || 0)}</div>
+                        </td>
+                        <td className="align-right font-mono text-sky-300">{formatRupiah(sh.returnsTotal || 0)}</td>
+                        <td className="align-right font-mono font-bold text-amber-300">{formatRupiah(sh.expectedCash || 0)}</td>
+                        <td className="align-right font-mono font-bold text-white">{formatRupiah(sh.actualCash || 0)}</td>
+                        <td className="align-center">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center space-x-1 ${
+                              diff === 0
+                                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                : diff > 0
+                                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                                : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                            }`}
+                          >
+                            <span>
+                              {diff === 0
+                                ? 'Sesuai (Rp 0)'
+                                : diff > 0
+                                ? `+${formatRupiah(diff)} (Lebih)`
+                                : `${formatRupiah(diff)} (Kurang)`}
+                            </span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Advanced Filter Toolbar */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col lg:flex-row gap-3 items-center justify-between">
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col lg:flex-row gap-3 items-center justify-between print:hidden">
         <div className="search-field w-full lg:w-80">
           <Search size={17} />
           <label htmlFor="transaction-search" className="sr-only">Cari transaksi</label>
@@ -323,6 +505,7 @@ export default function TransactionsPage() {
             <option value="Semua">Semua Status</option>
             <option value="Lunas">Lunas</option>
             <option value="Menunggu">Menunggu</option>
+            <option value="Retur">Retur</option>
             <option value="Gagal">Gagal</option>
           </select>
 
@@ -340,7 +523,7 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      <div className="data-panel">
+      <div className="data-panel print:hidden">
         <div className="table-scroll">
           <table className="data-table">
             <thead>
@@ -407,6 +590,16 @@ export default function TransactionsPage() {
                             Tandai Lunas
                           </button>
                         )}
+                        {tx.status === 'Lunas' && (
+                          <button
+                            type="button"
+                            onClick={(e) => promptReturn(tx, e)}
+                            className="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-bold rounded-lg transition shadow-sm"
+                            title="Retur dan kembalikan stok"
+                          >
+                            Retur
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -416,11 +609,13 @@ export default function TransactionsPage() {
           </table>
         </div>
       </div>
+        </>
+      )}
 
       {/* Transaction Detail Modal */}
       {showModal && selectedTx && (
-        <div className="modal-backdrop">
-          <div className="modal-card max-w-lg w-full p-6 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl text-slate-100">
+        <div className="modal-backdrop print:p-0 print:bg-white print:static">
+          <div className="modal-card shift-print-sheet max-w-lg w-full p-6 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl text-slate-100">
             <div className="flex justify-between items-start pb-4 border-b border-slate-800 mb-4">
               <div>
                 <span className="eyebrow" style={{ color: 'var(--accent-secondary)' }}>Detail Transaksi &amp; Pembayaran</span>
@@ -429,7 +624,7 @@ export default function TransactionsPage() {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
+                className="text-slate-400 hover:text-white p-1 rounded-lg print:hidden"
               >
                 &times;
               </button>
@@ -482,7 +677,7 @@ export default function TransactionsPage() {
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
+            <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-end gap-3 print:hidden">
               {isAdmin && selectedTx.status === 'Menunggu' && (
                 <button
                   type="button"
@@ -490,6 +685,16 @@ export default function TransactionsPage() {
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-md"
                 >
                   Tandai Pembayaran Lunas
+                </button>
+              )}
+              {selectedTx.status === 'Lunas' && (
+                <button
+                  type="button"
+                  onClick={(e) => { setShowModal(false); promptReturn(selectedTx, e); }}
+                  className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs transition shadow-md inline-flex items-center gap-1.5"
+                >
+                  <Undo2 size={14} />
+                  Retur Barang
                 </button>
               )}
               <button
@@ -537,6 +742,36 @@ export default function TransactionsPage() {
                 className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition"
               >
                 Ya, Tandai Lunas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReturnModal && txToReturn && (
+        <div className="modal-backdrop">
+          <div className="modal-card max-w-sm w-full p-6 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl text-slate-100 text-center animate-fadeIn">
+            <div className="w-12 h-12 bg-sky-500/20 text-sky-300 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Undo2 size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Konfirmasi Retur</h3>
+            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+              Kembalikan transaksi <strong className="text-sky-300 font-mono">{txToReturn.id}</strong> sebesar <strong className="text-sky-300">{formatRupiah(txToReturn.total)}</strong>? Stok barang akan masuk lagi ke gudang dan omzet transaksi ini dikeluarkan dari laporan.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => { setShowReturnModal(false); setTxToReturn(null); }}
+                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={executeReturn}
+                className="flex-1 py-2.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl shadow-md transition"
+              >
+                Ya, Proses Retur
               </button>
             </div>
           </div>

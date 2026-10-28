@@ -21,14 +21,16 @@ export default function KDSPage() {
         return acc;
       }, {});
 
-      const formatted = txs.map((tx, idx) => ({
-        id: tx.id,
-        date: tx.date || tx.createdAt,
-        items: tx.items || [],
-        payment: tx.payment,
-        total: tx.total,
-        status: statusMap[tx.id] || (idx < 3 ? 'COOKING' : 'READY'), // Default initial demo statuses
-      }));
+      const formatted = txs
+        .filter((tx) => statusMap[tx.id] && tx.status !== 'Retur')
+        .map((tx) => ({
+          id: tx.id,
+          date: tx.date || tx.createdAt,
+          items: tx.items || [],
+          payment: tx.payment,
+          total: tx.total,
+          status: statusMap[tx.id],
+        }));
 
       setOrders(formatted);
     };
@@ -68,7 +70,7 @@ export default function KDSPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-8">
+    <div className="min-h-screen bg-[#090c0b] text-slate-100 p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
           <div className="flex items-center space-x-4">
@@ -107,7 +109,7 @@ export default function KDSPage() {
 
         {filteredOrders.length === 0 ? (
           <div className="text-center py-20 bg-slate-900/50 border border-slate-800/80 rounded-3xl backdrop-blur-sm">
-            <Utensils className="mx-auto h-12 w-12 text-slate-600 mb-4" />
+            <Utensils className="mx-auto h-12 w-12 text-[#94a3b8] mb-4" />
             <h3 className="text-lg font-bold text-white">Tidak ada pesanan aktif</h3>
             <p className="text-slate-400 text-sm mt-1">Pesanan baru dari kasir akan langsung muncul di sini secara real-time.</p>
           </div>
@@ -137,7 +139,7 @@ export default function KDSPage() {
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-1">Daftar Item Pesanan:</h4>
                     <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                       {order.items.map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-sm bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/50">
+                        <div key={idx} className="flex items-center justify-between text-sm bg-[#090c0b]/40 p-2.5 rounded-xl border border-slate-800/50">
                           <span className="font-medium text-white">{item.name}</span>
                           <span className="font-mono font-bold text-teal-400 bg-teal-950/50 px-2.5 py-0.5 rounded-md">
                             {item.qty}x
@@ -180,7 +182,7 @@ export default function KDSPage() {
                       </button>
                     )}
                     {order.status === 'COMPLETED' && (
-                      <span className="col-span-2 text-center text-xs text-slate-500 py-2">Pesanan telah selesai</span>
+                      <span className="col-span-2 text-center text-xs text-[#94a3b8] py-2">Pesanan telah selesai</span>
                     )}
                   </div>
                 </div>
