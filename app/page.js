@@ -52,6 +52,44 @@ function CustomTooltip({ active, payload }) {
   return null;
 }
 
+function useAnimatedNumber(target, duration = 620) {
+  const [displayValue, setDisplayValue] = useState(target);
+
+  useEffect(() => {
+    const endValue = Number(target || 0);
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    ) {
+      setDisplayValue(endValue);
+      return;
+    }
+
+    let rafId = null;
+    const startValue = Number(displayValue || 0);
+    if (startValue === endValue) return;
+    const startTime = performance.now();
+
+    const step = (now) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      const current = Math.round(startValue + (endValue - startValue) * eased);
+      setDisplayValue(current);
+      if (progress < 1) {
+        rafId = window.requestAnimationFrame(step);
+      }
+    };
+
+    rafId = window.requestAnimationFrame(step);
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
+  }, [target, duration]);
+
+  return displayValue;
+}
+
 export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState(null);
   const [products, setProducts] = useState([]);
@@ -59,6 +97,9 @@ export default function Dashboard() {
   const [activeShift, setActiveShift] = useState(null);
   const [timeRange, setTimeRange] = useState('7days'); // 'today' | '7days' | '30days' | 'all'
   const [toastMessage, setToastMessage] = useState('');
+  const [dailyTarget, setDailyTarget] = useState(1500000);
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [targetInput, setTargetInput] = useState('1500000');
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -79,6 +120,12 @@ export default function Dashboard() {
     const loadedTransactions = readStoredArray('transactions').map(normalizeTransaction);
     setProducts(loadedProducts);
     setTransactions(loadedTransactions);
+
+    const savedTarget = Number(localStorage.getItem('zenith_daily_target'));
+    if (Number.isFinite(savedTarget) && savedTarget > 0) {
+      setDailyTarget(savedTarget);
+      setTargetInput(String(savedTarget));
+    }
 
     const savedShift = localStorage.getItem('zenith_active_shift');
     if (savedShift) {
@@ -208,11 +255,34 @@ export default function Dashboard() {
     });
   }, [transactions, timeRange]);
 
+  const animatedRevenue = useAnimatedNumber(totalRevenue);
+  const animatedTxCount = useAnimatedNumber(totalTransactionsCount);
+  const animatedGrossProfit = useAnimatedNumber(grossProfit);
+  const animatedTodayRevenue = useAnimatedNumber(todayRevenue);
+
+  const dailyProgressPct = Math.min(
+    100,
+    Math.round((todayRevenue / Math.max(dailyTarget, 1)) * 100)
+  );
+  const grossMarginPct =
+    totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : '0.0';
+
+  const handleSaveTarget = (e) => {
+    e.preventDefault();
+    const cleaned = Number(String(targetInput).replace(/\D/g, ''));
+    if (cleaned > 0) {
+      setDailyTarget(cleaned);
+      localStorage.setItem('zenith_daily_target', String(cleaned));
+      setEditingTarget(false);
+      showToast(`Target omzet harian diperbarui ke ${formatRupiah(cleaned)}`);
+    }
+  };
+
   const metrics = [
-    { label: 'Total Pendapatan', value: formatRupiah(totalRevenue), trend: timeRange === 'today' ? 'Hari Ini' : timeRange === '7days' ? '7 Hari' : 'Semua', icon: DollarSign, tone: 'primary' },
-    { label: 'Total Transaksi', value: String(totalTransactionsCount), trend: 'Aktual', icon: BarChart3, tone: 'secondary' },
+    { label: 'Total Pendapatan', value: formatRupiah(animatedRevenue), trend: timeRange === 'today' ? 'Hari Ini' : timeRange === '7days' ? '7 Hari' : 'Semua', icon: DollarSign, tone: 'primary' },
+    { label: 'Total Transaksi', value: String(animatedTxCount), trend: 'Aktual', icon: BarChart3, tone: 'secondary' },
     { label: 'Produk Stok Rendah', value: String(lowStockCount), trend: lowStockCount > 0 ? 'Perlu Restock' : 'Aman', icon: Warehouse, tone: 'warning' },
-    { label: 'Laba Kotor', value: formatRupiah(grossProfit), trend: 'Harga jual − modal', icon: TrendingUp, tone: 'danger' },
+    { label: 'Laba Kotor', value: formatRupiah(animatedGrossProfit), trend: `Margin ${grossMarginPct}%`, icon: TrendingUp, tone: 'danger' },
   ];
 
   const quickActions = [
@@ -320,6 +390,74 @@ export default function Dashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Daily Revenue Target & Profit Margin Progress Widget */}
+      <div className="spotlight-card bg-[#11141B] border border-white/[0.08] rounded-2xl p-5 shadow-xl relative overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono uppercase tracking-[0.14em] text-emerald-400 font-semibold">
+                Target Operasional Harian
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                {dailyProgressPct}% Tercapai
+              </span>
+            </div>
+            <div className="text-sm text-slate-300">
+              Omzet Hari Ini:{' '}
+              <strong className="text-white font-mono">{formatRupiah(animatedTodayRevenue)}</strong>{' '}
+              dari target <strong className="text-slate-200 font-mono">{formatRupiah(dailyTarget)}</strong>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isAdmin && !editingTarget && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetInput(String(dailyTarget));
+                  setEditingTarget(true);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition"
+              >
+                Atur Target Harian
+              </button>
+            )}
+            {isAdmin && editingTarget && (
+              <form onSubmit={handleSaveTarget} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={targetInput}
+                  onChange={(e) => setTargetInput(e.target.value.replace(/\D/g, ''))}
+                  className="w-36 bg-[#0B0D11] border border-white/15 rounded-xl px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
+                  placeholder="Rp Target..."
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition"
+                >
+                  Simpan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingTarget(false)}
+                  className="px-2.5 py-1.5 rounded-xl bg-white/[0.05] text-slate-400 hover:text-white text-xs font-semibold"
+                >
+                  Batal
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-3.5 w-full h-2.5 rounded-full bg-[#08090C] border border-white/[0.07] overflow-hidden relative">
+          <div
+            className="progress-shimmer h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-300 relative overflow-hidden transition-all duration-700 ease-out"
+            style={{ width: `${Math.max(dailyProgressPct, todayRevenue > 0 ? 4 : 0)}%` }}
+          />
+        </div>
       </div>
 
       {/* Main Analytics Section (Trend & Quick Actions) */}

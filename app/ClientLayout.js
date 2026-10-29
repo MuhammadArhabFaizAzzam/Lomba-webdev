@@ -21,8 +21,12 @@ import {
   Users,
   Truck,
   ChefHat,
+  Search,
+  Command,
+  ArrowRight,
 } from 'lucide-react';
 import { readStoredArray, normalizeProduct, LOW_STOCK_MAX } from './utils/storage';
+import { formatRupiah } from './utils/formatCurrency';
 
 export default function ClientLayout({ children }) {
   const pathname = usePathname();
@@ -33,6 +37,10 @@ export default function ClientLayout({ children }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [liveTime, setLiveTime] = useState('');
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [commandQuery, setCommandQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [catalogProducts, setCatalogProducts] = useState([]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -138,8 +146,10 @@ export default function ClientLayout({ children }) {
       const products = readStoredArray('products').map(normalizeProduct);
       const low = products.filter(p => Number(p.stock || 0) <= LOW_STOCK_MAX).length;
       setLowStockCount(low);
+      setCatalogProducts(products);
     } catch (e) {
       setLowStockCount(0);
+      setCatalogProducts([]);
     }
   };
 
@@ -337,6 +347,125 @@ export default function ClientLayout({ children }) {
     }
   }, [user, lowStockCount]);
 
+  const commandActions = useMemo(() => {
+    const q = commandQuery.trim().toLowerCase();
+    const navItems = navigationSections.flatMap((section) =>
+      section.items.map((item) => ({
+        id: `nav-${item.href}`,
+        type: 'navigation',
+        title: item.name,
+        subtitle: item.description,
+        href: item.href,
+        badge: item.badge || section.title,
+      }))
+    );
+
+    const extraActions = [];
+    if (user?.role === 'management' && lowStockCount > 0) {
+      extraActions.push({
+        id: 'act-low-stock',
+        type: 'action',
+        title: `Cek ${lowStockCount} Produk Stok Menipis`,
+        subtitle: 'Filter inventaris yang membutuhkan restock segera',
+        href: '/inventory?filter=low',
+        badge: 'Prioritas Gudang',
+      });
+    }
+
+    const filteredNav = [...extraActions, ...navItems].filter(
+      (item) =>
+        !q ||
+        item.title.toLowerCase().includes(q) ||
+        item.subtitle.toLowerCase().includes(q)
+    );
+
+    const matchingProducts = catalogProducts
+      .filter(
+        (prod) =>
+          !q ||
+          String(prod.name || '').toLowerCase().includes(q) ||
+          String(prod.category || '').toLowerCase().includes(q) ||
+          String(prod.id || '').toLowerCase().includes(q)
+      )
+      .slice(0, 5)
+      .map((prod) => ({
+        id: `prod-${prod.id}`,
+        type: 'product',
+        title: prod.name,
+        subtitle: `${prod.category || 'Umum'} · Harga: ${formatRupiah(prod.price)}${
+          user?.role === 'management' ? ` · HPP: ${formatRupiah(prod.cost || 0)}` : ''
+        }`,
+        stock: Number(prod.stock || 0),
+        href: user?.role === 'management' ? '/inventory' : '/pos',
+        badge:
+          Number(prod.stock || 0) <= 0
+            ? 'Stok Habis'
+            : Number(prod.stock || 0) <= LOW_STOCK_MAX
+            ? `Sisa ${prod.stock} (Menipis)`
+            : `Stok ${prod.stock}`,
+      }));
+
+    return [...filteredNav, ...matchingProducts];
+  }, [commandQuery, navigationSections, catalogProducts, user, lowStockCount]);
+
+  const executeCommandItem = (item) => {
+    if (!item) return;
+    setCommandOpen(false);
+    setCommandQuery('');
+    const performNav = () => {
+      router.push(item.href);
+    };
+    if (typeof document !== 'undefined' && document.startViewTransition) {
+      const transition = document.startViewTransition(() => {
+        performNav();
+      });
+      transition.finished.finally(() => {
+        document.getElementById('zenith-main-view')?.focus({ preventScroll: true });
+      });
+    } else {
+      performNav();
+      document.getElementById('zenith-main-view')?.focus({ preventScroll: true });
+    }
+  };
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [commandQuery, commandOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        if (!user) return;
+        e.preventDefault();
+        updateLowStockCount();
+        setCommandOpen((prev) => !prev);
+        return;
+      }
+      if (!commandOpen) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setCommandOpen(false);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) =>
+          commandActions.length > 0 ? (prev + 1) % commandActions.length : 0
+        );
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) =>
+          commandActions.length > 0
+            ? (prev - 1 + commandActions.length) % commandActions.length
+            : 0
+        );
+      } else if (e.key === 'Enter' && commandActions[selectedIndex]) {
+        e.preventDefault();
+        executeCommandItem(commandActions[selectedIndex]);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [user, commandOpen, commandActions, selectedIndex]);
+
   if (!user && (pathname === '/welcome' || pathname === '/login')) {
     return (
       <div className="min-h-screen bg-[#08090C] text-[#F8FAFC] flex flex-col font-sans relative overflow-x-hidden">
@@ -477,6 +606,18 @@ export default function ClientLayout({ children }) {
         <div className="flex items-center space-x-2">
           {user && (
             <button
+              onClick={() => {
+                updateLowStockCount();
+                setCommandOpen(true);
+              }}
+              aria-label="Cari menu atau produk"
+              className="p-2 rounded-lg bg-white/[0.06] border border-white/10 text-slate-300 hover:text-white transition"
+            >
+              <Search size={16} />
+            </button>
+          )}
+          {user && (
+            <button
               onClick={handleLogout}
               className="px-2.5 py-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/25 rounded-lg text-xs font-semibold transition"
             >
@@ -540,16 +681,34 @@ export default function ClientLayout({ children }) {
         </div>
 
         <header className="bg-[#08090C]/80 backdrop-blur-xl border-b border-white/[0.07] px-8 py-3.5 hidden md:flex items-center justify-between z-10 sticky top-0 print:hidden">
-          <div className="text-xs font-medium text-slate-400 flex items-center space-x-2.5">
-            <span>Workspace</span>
-            <span className="text-slate-600">/</span>
+          <div className="flex items-center space-x-4">
+            <div className="text-xs font-medium text-slate-400 flex items-center space-x-2.5">
+              <span>Workspace</span>
+              <span className="text-slate-600">/</span>
+              {user && (
+                <>
+                  <span className="font-semibold text-white">{user.username}</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase bg-white/[0.05] text-slate-300 border border-white/10">
+                    {user.role === 'management' ? 'Admin' : 'Kasir'}
+                  </span>
+                </>
+              )}
+            </div>
             {user && (
-              <>
-                <span className="font-semibold text-white">{user.username}</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase bg-white/[0.05] text-slate-300 border border-white/10">
-                  {user.role === 'management' ? 'Admin' : 'Kasir'}
-                </span>
-              </>
+              <button
+                type="button"
+                onClick={() => {
+                  updateLowStockCount();
+                  setCommandOpen(true);
+                }}
+                className="flex items-center space-x-3 px-3.5 py-1.5 rounded-xl bg-[#11141B] hover:bg-[#171B24] border border-white/[0.08] hover:border-emerald-500/30 text-xs text-slate-400 hover:text-slate-200 transition group"
+              >
+                <Search size={13} className="text-slate-500 group-hover:text-emerald-400 transition" />
+                <span>Cari menu atau cek stok produk...</span>
+                <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/10 text-[10px] font-mono text-slate-300">
+                  Ctrl K
+                </kbd>
+              </button>
             )}
           </div>
           <div className="flex items-center space-x-3">
@@ -574,12 +733,107 @@ export default function ClientLayout({ children }) {
         </header>
 
         <div
+          id="zenith-main-view"
+          tabIndex={-1}
           key={pathname}
-          className="zenith-page-enter relative z-1 flex-1 p-6 md:p-10 lg:p-12 max-w-7xl 2xl:max-w-[1700px] w-full mx-auto print:p-0 print:max-w-none"
+          className="zenith-page-enter outline-none relative z-1 flex-1 p-6 md:p-10 lg:p-12 max-w-7xl 2xl:max-w-[1700px] w-full mx-auto print:p-0 print:max-w-none"
         >
           {children}
         </div>
       </main>
+
+      {/* Global Command Palette Modal (Ctrl+K) */}
+      {commandOpen && user && (
+        <div
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-start justify-center pt-16 md:pt-24 p-4 print:hidden animate-fadeIn"
+          onClick={() => setCommandOpen(false)}
+        >
+          <div
+            className="w-full max-w-xl bg-[#11141B] border border-white/15 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center px-4 py-3.5 border-b border-white/[0.08] gap-3 bg-[#0B0D11]">
+              <Command size={16} className="text-emerald-400 shrink-0" />
+              <input
+                type="text"
+                autoFocus
+                value={commandQuery}
+                onChange={(e) => setCommandQuery(e.target.value)}
+                placeholder="Ketik nama halaman, aksi cepat, atau nama produk untuk cek stok..."
+                className="w-full bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setCommandOpen(false)}
+                className="px-2 py-0.5 rounded bg-white/[0.06] border border-white/10 text-[10px] font-mono text-slate-400 hover:text-white"
+              >
+                ESC
+              </button>
+            </div>
+
+            <div className="max-h-96 overflow-y-auto p-2 space-y-1">
+              {commandActions.length === 0 ? (
+                <div className="py-10 text-center text-xs text-slate-400">
+                  Tidak ditemukan menu atau produk yang cocok dengan &ldquo;{commandQuery}&rdquo;.
+                </div>
+              ) : (
+                commandActions.map((item, idx) => {
+                  const isSelected = idx === selectedIndex;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onMouseEnter={() => setSelectedIndex(idx)}
+                      onClick={() => executeCommandItem(item)}
+                      className={`w-full text-left px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-3 transition ${
+                        isSelected
+                          ? 'bg-emerald-500/15 border border-emerald-500/35 text-white'
+                          : 'border border-transparent text-slate-300 hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-white truncate flex items-center gap-2">
+                          <span>{item.title}</span>
+                          {item.type === 'product' && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase bg-white/[0.06] text-slate-300">
+                              Produk
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                          {item.subtitle}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {item.badge && (
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-semibold font-mono border ${
+                              item.type === 'product' && item.stock <= LOW_STOCK_MAX
+                                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                : 'bg-white/[0.05] text-slate-300 border-white/10'
+                            }`}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                        <ArrowRight
+                          size={13}
+                          className={isSelected ? 'text-emerald-400 translate-x-0.5 transition' : 'text-slate-600'}
+                        />
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="px-4 py-2.5 bg-[#0B0D11] border-t border-white/[0.07] flex items-center justify-between text-[11px] text-slate-500">
+              <span>Gunakan tombol <strong className="text-slate-300">↑↓</strong> untuk memilih, <strong className="text-slate-300">Enter</strong> untuk membuka</span>
+              <span className="font-mono text-emerald-400/90">Zenith Quick Launcher</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

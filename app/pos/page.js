@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Minus, Plus, Search, ShoppingCart, Trash2, ShieldCheck, MessageCircle, Clock, Users, QrCode, Printer, Scan, CheckCircle2, AlertTriangle, X } from 'lucide-react';
+import { Minus, Plus, Search, ShoppingCart, Trash2, ShieldCheck, MessageCircle, Clock, Users, QrCode, Printer, Scan, CheckCircle2, AlertTriangle, X, PauseCircle, PlayCircle, FileText, UtensilsCrossed } from 'lucide-react';
 import { formatRupiah } from '../utils/formatCurrency';
 import {
   ensureInitialCatalog,
@@ -15,6 +15,20 @@ import {
 } from '../utils/storage';
 
 const categories = ['Semua', 'Makanan', 'Minuman', 'Cemilan', 'Lainnya'];
+const quickTablePresets = ['Meja 01', 'Meja 02', 'Meja 03', 'Takeaway'];
+
+const runViewTransition = (callback) => {
+  if (typeof document !== 'undefined' && document.startViewTransition) {
+    document.startViewTransition(() => {
+      callback();
+    });
+  } else {
+    callback();
+  }
+};
+
+const toSafeTransitionId = (prefix, id) =>
+  `${prefix}-${String(id ?? 'item').replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
 const snapshotCartItem = (item) => ({
   id: item.id,
@@ -68,6 +82,12 @@ export default function POSPage() {
   const [actualCashInput, setActualCashInput] = useState('');
   const [shiftReport, setShiftReport] = useState(null);
 
+  // Hold / Parkir Nota & Catatan Pesanan States
+  const [tableLabel, setTableLabel] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
+  const [heldOrders, setHeldOrders] = useState([]);
+  const [showHeldModal, setShowHeldModal] = useState(false);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3500);
@@ -84,6 +104,7 @@ export default function POSPage() {
     }
 
     setProducts(ensureInitialCatalog());
+    setHeldOrders(readStoredArray('zenith_held_orders'));
     const storedCusts = readStoredArray('zenith_customers');
     if (storedCusts.length === 0) {
       const defaults = [
@@ -204,40 +225,91 @@ export default function POSPage() {
       return;
     }
 
-    setCart((prevCart) => {
-      const existing = prevCart.find((item) => item.id === product.id);
-      if (existing) {
-        if (existing.qty >= product.stock) {
-          showToast('Jumlah melebihi stok tersedia di gudang!');
-          return prevCart;
+    runViewTransition(() => {
+      setCart((prevCart) => {
+        const existing = prevCart.find((item) => item.id === product.id);
+        if (existing) {
+          if (existing.qty >= product.stock) {
+            showToast('Jumlah melebihi stok tersedia di gudang!');
+            return prevCart;
+          }
+          return prevCart.map((item) =>
+            item.id === product.id ? { ...item, qty: item.qty + 1 } : item,
+          );
         }
-        return prevCart.map((item) =>
-          item.id === product.id ? { ...item, qty: item.qty + 1 } : item,
-        );
-      }
-      return [...prevCart, { ...product, qty: 1 }];
+        return [...prevCart, { ...product, qty: 1 }];
+      });
     });
   };
 
   const updateQty = (productId, delta) => {
-    setCart((prevCart) => {
-      return prevCart.flatMap((item) => {
-        if (item.id !== productId) return [item];
-        const product = products.find((p) => p.id === productId);
-        const nextQty = item.qty + delta;
+    runViewTransition(() => {
+      setCart((prevCart) => {
+        return prevCart.flatMap((item) => {
+          if (item.id !== productId) return [item];
+          const product = products.find((p) => p.id === productId);
+          const nextQty = item.qty + delta;
 
-        if (nextQty <= 0) return [];
-        if (product && nextQty > product.stock) {
-          showToast('Melebihi stok gudang!');
-          return [item];
-        }
-        return [{ ...item, qty: nextQty }];
+          if (nextQty <= 0) return [];
+          if (product && nextQty > product.stock) {
+            showToast('Melebihi stok gudang!');
+            return [item];
+          }
+          return [{ ...item, qty: nextQty }];
+        });
       });
     });
   };
 
   const removeFromCart = (productId) => {
-    setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
+    runViewTransition(() => {
+      setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
+    });
+  };
+
+  const handleHoldOrder = () => {
+    if (cart.length === 0) return;
+    const heldEntry = {
+      id: `HOLD-${Date.now().toString().slice(-5)}`,
+      createdAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      tableLabel: tableLabel.trim() || 'Tanpa Meja',
+      orderNotes: orderNotes.trim(),
+      customerId: selectedCustomerId,
+      customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
+      total,
+      items: cart.map(snapshotCartItem),
+    };
+    const nextHeld = [heldEntry, ...heldOrders];
+    setHeldOrders(nextHeld);
+    writeStoredArray('zenith_held_orders', nextHeld);
+    runViewTransition(() => {
+      setCart([]);
+      setTableLabel('');
+      setOrderNotes('');
+      setSelectedCustomerId('');
+    });
+    showToast(`Nota "${heldEntry.tableLabel}" disimpan sementara (${heldEntry.items.length} item).`);
+  };
+
+  const handleRecallOrder = (held) => {
+    const nextHeld = heldOrders.filter((entry) => entry.id !== held.id);
+    setHeldOrders(nextHeld);
+    writeStoredArray('zenith_held_orders', nextHeld);
+    runViewTransition(() => {
+      setCart(held.items || []);
+      setTableLabel(held.tableLabel === 'Tanpa Meja' ? '' : held.tableLabel || '');
+      setOrderNotes(held.orderNotes || '');
+      setSelectedCustomerId(held.customerId || '');
+    });
+    setShowHeldModal(false);
+    showToast(`Nota "${held.tableLabel}" dipanggil kembali ke keranjang!`);
+  };
+
+  const handleDeleteHeldOrder = (heldId) => {
+    const nextHeld = heldOrders.filter((entry) => entry.id !== heldId);
+    setHeldOrders(nextHeld);
+    writeStoredArray('zenith_held_orders', nextHeld);
+    showToast('Nota yang diparkir telah dihapus.');
   };
 
   const handleScannerSubmit = (e) => {
@@ -272,6 +344,8 @@ export default function POSPage() {
       id: qrisId,
       amount: total,
       items: [...cart],
+      tableLabel: tableLabel.trim(),
+      orderNotes: orderNotes.trim(),
       createdAt: new Date().toLocaleDateString('id-ID') + ' ' + new Date().toTimeString().slice(0, 5),
       status: 'PENDING',
     });
@@ -291,6 +365,9 @@ export default function POSPage() {
       year: 'numeric',
     }) + ' ' + now.toTimeString().slice(0, 5);
 
+    const resolvedTable = activeQrisOrder.tableLabel ?? tableLabel.trim();
+    const resolvedNotes = activeQrisOrder.orderNotes ?? orderNotes.trim();
+
     const transaction = normalizeTransaction({
       id: transactionId,
       date: dateStr,
@@ -303,6 +380,8 @@ export default function POSPage() {
       discountAmount,
       total: activeQrisOrder.amount,
       customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
+      tableLabel: resolvedTable,
+      orderNotes: resolvedNotes,
       cashReceived: null,
       change: null,
       status: 'Lunas',
@@ -346,7 +425,10 @@ export default function POSPage() {
     }
 
     const kdsStatuses = readStoredArray('kds_statuses');
-    writeStoredArray('kds_statuses', [{ id: transactionId, status: 'PENDING' }, ...kdsStatuses]);
+    writeStoredArray('kds_statuses', [
+      { id: transactionId, status: 'PENDING', tableLabel: resolvedTable, orderNotes: resolvedNotes },
+      ...kdsStatuses,
+    ]);
 
     const updatedProducts = currentProducts.map((product) => {
       const cartItem = activeQrisOrder.items.find((item) => item.id === product.id);
@@ -368,16 +450,20 @@ export default function POSPage() {
       discountAmount,
       customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
       customerPhone: selectedCustomer ? selectedCustomer.phone : '',
+      tableLabel: resolvedTable,
+      orderNotes: resolvedNotes,
       cashReceived: null,
       change: null,
       cartItems: transaction.items,
     });
     setShowReceiptModal(true);
     setCart([]);
+    setTableLabel('');
+    setOrderNotes('');
     setActiveQrisOrder(null);
     setSelectedCustomerId('');
     setPaymentMethod('QRIS');
-    showToast('Pembayaran QRIS Berhasil & Lunas via Webhook Simulator!');
+    showToast('Pembayaran QRIS Berhasil & Lunas!');
   };
 
   const handleSaveQrisPending = () => {
@@ -389,6 +475,9 @@ export default function POSPage() {
       month: '2-digit',
       year: 'numeric',
     }) + ' ' + now.toTimeString().slice(0, 5);
+
+    const resolvedTable = activeQrisOrder.tableLabel ?? tableLabel.trim();
+    const resolvedNotes = activeQrisOrder.orderNotes ?? orderNotes.trim();
 
     const transaction = normalizeTransaction({
       id: transactionId,
@@ -402,6 +491,8 @@ export default function POSPage() {
       discountAmount,
       total: activeQrisOrder.amount,
       customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
+      tableLabel: resolvedTable,
+      orderNotes: resolvedNotes,
       cashReceived: null,
       change: null,
       status: 'Menunggu',
@@ -414,6 +505,8 @@ export default function POSPage() {
     writeStoredArray('transactions', nextTransactions);
 
     setCart([]);
+    setTableLabel('');
+    setOrderNotes('');
     setActiveQrisOrder(null);
     setSelectedCustomerId('');
     setPaymentMethod('QRIS');
@@ -455,6 +548,9 @@ export default function POSPage() {
       year: 'numeric',
     }) + ' ' + now.toTimeString().slice(0, 5);
 
+    const resolvedTable = tableLabel.trim();
+    const resolvedNotes = orderNotes.trim();
+
     const transaction = normalizeTransaction({
       id: transactionId,
       date: dateStr,
@@ -467,6 +563,8 @@ export default function POSPage() {
       discountAmount,
       total,
       customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
+      tableLabel: resolvedTable,
+      orderNotes: resolvedNotes,
       cashReceived: paymentMethod === 'Tunai' ? cashAmount : null,
       change: paymentMethod === 'Tunai' ? change : null,
       status: 'Lunas',
@@ -512,7 +610,10 @@ export default function POSPage() {
     }
 
     const kdsStatuses = readStoredArray('kds_statuses');
-    writeStoredArray('kds_statuses', [{ id: transactionId, status: 'PENDING' }, ...kdsStatuses]);
+    writeStoredArray('kds_statuses', [
+      { id: transactionId, status: 'PENDING', tableLabel: resolvedTable, orderNotes: resolvedNotes },
+      ...kdsStatuses,
+    ]);
 
     const updatedProducts = currentProducts.map((product) => {
       const cartItem = cart.find((item) => item.id === product.id);
@@ -534,12 +635,16 @@ export default function POSPage() {
       discountAmount,
       customerName: selectedCustomer ? selectedCustomer.name : 'Umum',
       customerPhone: selectedCustomer ? selectedCustomer.phone : '',
+      tableLabel: resolvedTable,
+      orderNotes: resolvedNotes,
       cashReceived: transaction.cashReceived,
       change: transaction.change,
       cartItems: transaction.items,
     });
     setShowReceiptModal(true);
     setCart([]);
+    setTableLabel('');
+    setOrderNotes('');
     setCashReceived('');
     setSelectedCustomerId('');
     setPaymentMethod('QRIS');
@@ -561,6 +666,8 @@ export default function POSPage() {
       `No. Trx: ${receiptData.id}`,
       `Waktu: ${receiptData.date}`,
       `Pelanggan: ${receiptData.customerName}`,
+      ...(receiptData.tableLabel ? [`Meja / Tipe: ${receiptData.tableLabel}`] : []),
+      ...(receiptData.orderNotes ? [`Catatan: ${receiptData.orderNotes}`] : []),
       `Metode: ${receiptData.payment}`,
       '--------------------------------',
       itemLines,
@@ -827,6 +934,76 @@ export default function POSPage() {
         </div>
       )}
 
+      {/* Held / Parked Orders Modal */}
+      {showHeldModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <div>
+                <span className="eyebrow" style={{ color: 'var(--accent-primary)' }}>Hold &amp; Recall Queue</span>
+                <h3>Daftar Nota Diparkir ({heldOrders.length})</h3>
+              </div>
+              <button onClick={() => setShowHeldModal(false)} className="text-slate-400 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: '8px 0 14px' }}>
+              Pilih nota yang diparkir untuk mengembalikannya ke keranjang kasir dan melanjutkan pembayaran.
+            </p>
+            <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+              {heldOrders.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-400">
+                  Belum ada nota yang diparkir saat ini.
+                </div>
+              ) : (
+                heldOrders.map((held) => (
+                  <div
+                    key={held.id}
+                    className="p-3.5 rounded-xl bg-[#0B0D11] border border-white/10 flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white">{held.tableLabel}</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
+                          {held.createdAt}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-1 truncate">
+                        {held.customerName} · {held.items?.length || 0} jenis item ·{' '}
+                        <strong className="text-emerald-400 font-mono">{formatRupiah(held.total)}</strong>
+                      </div>
+                      {held.orderNotes && (
+                        <div className="text-[11px] text-amber-300/90 mt-0.5 truncate">
+                          Catatan: {held.orderNotes}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleRecallOrder(held)}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold flex items-center gap-1 transition"
+                      >
+                        <PlayCircle size={13} />
+                        <span>Panggil</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteHeldOrder(held.id)}
+                        className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/25 transition"
+                        title="Hapus nota parkir"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Left Catalog Section */}
       <section className="pos-catalog print:hidden">
         <div className="catalog-header">
@@ -835,6 +1012,16 @@ export default function POSPage() {
             <h2>Katalog Produk UMKM</h2>
           </div>
           <div className="flex items-center space-x-2">
+            {heldOrders.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowHeldModal(true)}
+                className="px-3 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/35 rounded-xl text-xs font-bold transition flex items-center space-x-1.5"
+              >
+                <PauseCircle size={15} />
+                <span>Nota Diparkir ({heldOrders.length})</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setShowScannerModal(true)}
@@ -864,7 +1051,7 @@ export default function POSPage() {
               <button
                 key={cat}
                 type="button"
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => runViewTransition(() => setSelectedCategory(cat))}
                 className={`category-pill ${selectedCategory === cat ? 'active' : ''}`}
               >
                 {cat}
@@ -907,15 +1094,16 @@ export default function POSPage() {
               return (
                 <div
                   key={product.id}
+                  style={{ viewTransitionName: toSafeTransitionId('pos-prod', product.id) }}
                   onClick={() => addToCart(product)}
-                  className={`product-card group ${isOutOfStock ? 'opacity-60 cursor-not-allowed' : ''} ${inCartQty > 0 ? 'ring-1 ring-emerald-400/60 border-emerald-400/50' : ''}`}
+                  className={`product-card vt-product-card group ${isOutOfStock ? 'opacity-60 cursor-not-allowed' : ''} ${inCartQty > 0 ? 'ring-1 ring-emerald-400/60 border-emerald-400/50' : ''}`}
                 >
                   <div className="product-top">
                     <span className="product-category">{product.category}</span>
                     <div className="flex items-center gap-1.5">
                       {inCartQty > 0 && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500 text-slate-950 shadow-sm animate-fadeIn">
-                          {inCartQty}x
+                        <span key={inCartQty} className="badge-pop px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500 text-slate-950 shadow-sm">
+                          {inCartQty}x di Nota
                         </span>
                       )}
                       <span
@@ -955,38 +1143,94 @@ export default function POSPage() {
             <ShoppingCart size={18} color="var(--accent-secondary)" />
             <h3 className="cart-title">Keranjang Belanja</h3>
           </div>
-          {activeShift && (
-            <button
-              onClick={() => setShowCloseShiftModal(true)}
-              className="text-[10px] font-bold px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition"
-              title="Tutup Shift Kasir"
-            >
-              Shift: {activeShift.transactionsCount} Trx
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={handleHoldOrder}
+                className="text-[10px] font-bold px-2.5 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition flex items-center gap-1"
+                title="Simpan / Parkir Nota Sementara"
+              >
+                <PauseCircle size={11} />
+                <span>Parkir Nota</span>
+              </button>
+            )}
+            {activeShift && (
+              <button
+                onClick={() => setShowCloseShiftModal(true)}
+                className="text-[10px] font-bold px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition"
+                title="Tutup Shift Kasir"
+              >
+                Shift: {activeShift.transactionsCount} Trx
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Customer CRM Selector */}
-        <div className="p-3 bg-[var(--bg-canvas)] border-b border-[var(--border-default)]">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-bold text-[var(--text-secondary)] flex items-center space-x-1">
-              <Users size={12} className="text-emerald-400" />
-              <span>Pelanggan / Member (CRM)</span>
-            </span>
-            <Link href="/customers" className="text-[10px] text-emerald-400 hover:underline font-bold">+ Baru</Link>
+        {/* Customer CRM Selector & Table/Order Notes */}
+        <div className="p-3 bg-[var(--bg-canvas)] border-b border-[var(--border-default)] space-y-2.5 rounded-xl">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-bold text-[var(--text-secondary)] flex items-center space-x-1">
+                <Users size={12} className="text-emerald-400" />
+                <span>Pelanggan / Member (CRM)</span>
+              </span>
+              <Link href="/customers" className="text-[10px] text-emerald-400 hover:underline font-bold">+ Baru</Link>
+            </div>
+            <select
+              value={selectedCustomerId}
+              onChange={(e) => setSelectedCustomerId(e.target.value)}
+              className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-emerald-500"
+            >
+              <option value="">-- Pembeli Umum (Tanpa Member) --</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.tier} Member - {c.points} Poin)
+                </option>
+              ))}
+            </select>
           </div>
-          <select
-            value={selectedCustomerId}
-            onChange={(e) => setSelectedCustomerId(e.target.value)}
-            className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-emerald-500"
-          >
-            <option value="">-- Pembeli Umum (Tanpa Member) --</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} ({c.tier} Member - {c.points} Poin)
-              </option>
-            ))}
-          </select>
+
+          <div className="grid grid-cols-1 gap-2 pt-1 border-t border-white/[0.06]">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[10px] font-semibold text-slate-400 flex items-center gap-1">
+                <UtensilsCrossed size={11} className="text-emerald-400" />
+                <span>Meja / Tipe:</span>
+              </span>
+              <div className="flex items-center gap-1 flex-wrap justify-end">
+                {quickTablePresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setTableLabel(tableLabel === preset ? '' : preset)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-semibold transition border ${
+                      tableLabel === preset
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : 'bg-white/[0.04] text-slate-400 border-white/[0.08] hover:text-white'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <input
+                type="text"
+                value={tableLabel}
+                onChange={(e) => setTableLabel(e.target.value)}
+                placeholder="No. Meja / Label..."
+                className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg px-2.5 py-1.5 text-[11px] text-[var(--text-primary)] placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+              />
+              <input
+                type="text"
+                value={orderNotes}
+                onChange={(e) => setOrderNotes(e.target.value)}
+                placeholder="Catatan dapur (Less sugar...)"
+                className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg px-2.5 py-1.5 text-[11px] text-[var(--text-primary)] placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Cart Items List */}
@@ -999,7 +1243,11 @@ export default function POSPage() {
             </div>
           ) : (
             cart.map((item) => (
-              <div key={item.id} className="cart-item">
+              <div
+                key={item.id}
+                style={{ viewTransitionName: toSafeTransitionId('pos-cart', item.id) }}
+                className="cart-item vt-cart-item"
+              >
                 <div className="item-info">
                   <span className="item-name">{formatProductName(item.name)}</span>
                   <span className="item-price">{formatRupiah(item.price)}</span>
@@ -1160,6 +1408,18 @@ export default function POSPage() {
                   <span style={{ color: 'var(--text-secondary)' }}>Metode Bayar:</span>
                   <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{receiptData.payment}</span>
                 </div>
+                {receiptData.tableLabel && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Meja / Tipe:</span>
+                    <span style={{ fontWeight: 700, color: 'var(--accent-secondary)' }}>{receiptData.tableLabel}</span>
+                  </div>
+                )}
+                {receiptData.orderNotes && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Catatan:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-primary)', textAlign: 'right' }}>{receiptData.orderNotes}</span>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'grid', gap: '8px', paddingBottom: '12px', borderBottom: '1px dashed var(--border-default)', fontSize: '0.75rem' }}>

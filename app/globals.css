@@ -2276,3 +2276,118 @@ h6,
     }
   }
 }
+
+/* ==========================================================================
+   6. VIEW TRANSITIONS API (GROUP & SAME-DOCUMENT MORPHING)
+   ========================================================================== */
+
+:root {
+  /* Disable the root transition so only targeted cards/items morph while UI stays interactive */
+  view-transition-name: none;
+}
+
+::view-transition {
+  /* Non-transitioned elements below the view transitions remain interactive */
+  pointer-events: none;
+}
+
+.vt-product-card {
+  view-transition-class: pos-card;
+}
+
+.vt-cart-item {
+  view-transition-class: cart-item;
+}
+
+.vt-kds-ticket {
+  view-transition-class: kds-ticket;
+}
+
+::view-transition-group(.pos-card),
+::view-transition-group(.cart-item),
+::view-transition-group(.kds-ticket) {
+  animation-duration: 0.34s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes vt-slide-in {
+  from {
+    opacity: 0;
+    translate: 0 14px;
+    scale: 0.96;
+  }
+}
+
+@keyframes vt-slide-out {
+  to {
+    opacity: 0;
+    translate: -18px 0;
+    scale: 0.95;
+  }
+}
+
+::view-transition-new(.pos-card):only-child,
+::view-transition-new(.cart-item):only-child,
+::view-transition-new(.kds-ticket):only-child {
+  animation-name: vt-slide-in;
+  animation-duration: 0.28s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(.pos-card):only-child,
+::view-transition-old(.cart-item):only-child,
+::view-transition-old(.kds-ticket):only-child {
+  animation-name: vt-slide-out;
+  animation-duration: 0.22s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* Tactile Spring Badge Pop & Progress Bar Shimmer */
+@keyframes badge-spring-pop {
+  0% {
+    scale: 0.65;
+    opacity: 0;
+  }
+  70% {
+    scale: 1.12;
+    opacity: 1;
+  }
+  100% {
+    scale: 1;
+    opacity: 1;
+  }
+}
+
+.badge-pop {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: badge-spring-pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  }
+}
+
+@keyframes progress-shimmer-sweep {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 220% 0;
+  }
+}
+
+.progress-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  @media (prefers-reduced-motion: no-preference) {
+    animation: progress-shimmer-sweep 2.8s ease-in-out infinite;
+  }
+}
