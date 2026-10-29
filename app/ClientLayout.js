@@ -32,11 +32,87 @@ export default function ClientLayout({ children }) {
   const [toastMessage, setToastMessage] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
   const [lowStockCount, setLowStockCount] = useState(0);
+  const [liveTime, setLiveTime] = useState('');
 
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3500);
   };
+
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      setLiveTime(
+        now.toLocaleTimeString('id-ID', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        })
+      );
+    };
+    updateClock();
+    const timer = setInterval(updateClock, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Scroll-driven animation IntersectionObserver fallback for browsers without view() support
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const supportsViewTimeline = window.CSS?.supports?.(
+      '(animation-timeline: view()) and (animation-range: entry)'
+    );
+    if (supportsViewTimeline) return;
+
+    const elements = document.querySelectorAll('.scroll-reveal');
+    if (elements.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+          }
+        }
+      },
+      { threshold: 0.12 }
+    );
+
+    elements.forEach((el) => {
+      el.classList.add('scroll-reveal-fallback');
+      observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [pathname]);
+
+  // Passive pointer-tracking radial spotlight for interactive cards
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let rafId = null;
+    const handlePointerMove = (e) => {
+      if (rafId) return;
+      const clientX = e.clientX;
+      const clientY = e.clientY;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        const target = document.elementFromPoint(clientX, clientY);
+        if (!target) return;
+        const card = target.closest(
+          '.metric-card, .stat-box, .chart-card, .summary-panel, .quick-panel, .welcome-card, .spotlight-card, .product-card'
+        );
+        if (card) {
+          const rect = card.getBoundingClientRect();
+          card.style.setProperty('--spotlight-x', `${Math.round(clientX - rect.left)}px`);
+          card.style.setProperty('--spotlight-y', `${Math.round(clientY - rect.top)}px`);
+        }
+      });
+    };
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   const syncAuth = () => {
     const savedUser = localStorage.getItem('zenith_auth_user');
@@ -68,9 +144,6 @@ export default function ClientLayout({ children }) {
   };
 
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7682/ingest/ca64648d-ea64-4da8-a11d-7f73285073ae',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'268840'},body:JSON.stringify({sessionId:'268840',runId:'pre-fix',hypothesisId:'A-D',location:'ClientLayout.js:mount',message:'page boot',data:{href:window.location.href,path:window.location.pathname,nextPath:pathname,title:document.title,text:document.body?.innerText?.slice(0,180)||''},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     syncAuth();
     updateLowStockCount();
 
@@ -266,62 +339,58 @@ export default function ClientLayout({ children }) {
 
   if (!user && (pathname === '/welcome' || pathname === '/login')) {
     return (
-      <div className="min-h-screen bg-[#0a0e0d] text-[#f0fdf4] flex flex-col font-sans relative">
+      <div className="min-h-screen bg-[#08090C] text-[#F8FAFC] flex flex-col font-sans relative overflow-x-hidden">
         {toastMessage && (
-          <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce flex items-center space-x-2">
-            <Bell size={16} className="text-amber-400" />
+          <div className="zenith-toast fixed top-5 right-5 z-50 bg-[#11141B]/95 backdrop-blur-xl text-white px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold border border-white/10 items-center space-x-2.5">
+            <Bell size={16} className="text-emerald-400 shrink-0" />
             <span>{toastMessage}</span>
           </div>
         )}
-        {children}
+        <div key={pathname} className="zenith-page-enter flex-1 flex flex-col">
+          {children}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0e0d] text-[#f0fdf4] flex flex-col md:flex-row font-sans relative">
+    <div className="min-h-screen bg-[#08090C] text-[#F8FAFC] flex flex-col md:flex-row font-sans relative overflow-x-hidden">
       {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce flex items-center space-x-2">
-          <span>🔔</span>
+        <div className="zenith-toast fixed top-5 right-5 z-50 bg-[#11141B]/95 backdrop-blur-xl text-white px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold border border-white/10 items-center space-x-2.5">
+          <Bell size={16} className="text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Sidebar for Desktop */}
-      <aside className="hidden md:flex md:w-68 bg-[#090E1A] text-white flex-col shadow-2xl border-r border-slate-800/80 z-20 sticky top-0 h-screen overflow-y-auto select-none print:hidden">
+      <aside className="hidden md:flex md:w-68 bg-[#0B0D11]/95 backdrop-blur-2xl text-white flex-col border-r border-white/[0.07] z-20 sticky top-0 h-screen overflow-y-auto select-none print:hidden">
         {/* Brand Header */}
-        <div className="p-5 border-b border-slate-800/80 bg-[#0B1222]/60">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-amber-500 flex items-center justify-center font-black text-white text-lg shadow-lg shadow-emerald-500/25">
-              Z
+        <div className="p-5 border-b border-white/[0.07] relative overflow-hidden">
+          <div className="flex items-center space-x-3 relative z-10">
+            <div className="w-9 h-9 rounded-xl bg-[#141820] border border-white/15 flex items-center justify-center font-extrabold text-white text-base shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+              <span className="text-emerald-400">Z</span>
             </div>
             <div>
-              <div className="font-extrabold text-base tracking-tight text-white flex items-center space-x-1.5">
+              <div className="font-bold text-sm tracking-tight text-white flex items-center space-x-2">
                 <span>Zenith POS</span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">PRO</span>
+                <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300 border border-white/10">v2.0</span>
               </div>
-              <div className="text-[11px] text-slate-400 font-medium">Digital Retail & POS Hub</div>
+              <div className="text-[11px] text-slate-400 font-medium">Enterprise Retail Suite</div>
             </div>
           </div>
         </div>
 
         {/* Role Badge & User Profile Info */}
         {user && (
-          <div className="p-4 border-b border-slate-800/60 bg-[#0D1527]/50">
-            <div className={`p-3 rounded-xl border flex items-center justify-between ${
-              user.role === 'management'
-                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
-                : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
-            }`}>
+          <div className="p-3.5 border-b border-white/[0.07]">
+            <div className="p-3 rounded-xl border border-white/[0.08] bg-[#11141B] flex items-center justify-between shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               <div className="flex items-center space-x-2.5 min-w-0">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
-                  user.role === 'management' ? 'bg-emerald-600 text-white' : 'bg-emerald-600 text-white'
-                }`}>
-                  {user.role === 'management' ? <ShieldCheck size={16} /> : <UserCheck size={16} />}
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                  {user.role === 'management' ? <ShieldCheck size={15} /> : <UserCheck size={15} />}
                 </div>
                 <div className="truncate">
-                  <div className="text-xs font-bold text-white truncate">{user.username}</div>
-                  <div className="text-[10px] font-semibold tracking-wide uppercase opacity-80">
+                  <div className="text-xs font-semibold text-white truncate">{user.username}</div>
+                  <div className="text-[10px] font-medium tracking-wider uppercase text-slate-400">
                     {user.role === 'management' ? 'Administrator' : 'Staf Kasir'}
                   </div>
                 </div>
@@ -329,7 +398,7 @@ export default function ClientLayout({ children }) {
               <button
                 onClick={handleLogout}
                 title="Keluar dari akun"
-                className="p-1.5 hover:bg-rose-900/60 text-slate-400 hover:text-rose-200 rounded-lg transition"
+                className="p-1.5 hover:bg-white/[0.06] text-slate-400 hover:text-rose-300 rounded-lg transition"
               >
                 <LogOut size={14} />
               </button>
@@ -341,7 +410,7 @@ export default function ClientLayout({ children }) {
         <nav className="flex-1 p-3.5 space-y-6">
           {navigationSections.map((section, idx) => (
             <div key={idx} className="space-y-1.5">
-              <div className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+              <div className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em] flex items-center justify-between">
                 <span>{section.title}</span>
               </div>
               <div className="space-y-1">
@@ -353,20 +422,23 @@ export default function ClientLayout({ children }) {
                     <Link
                       key={item.name}
                       href={item.href}
-                      className={`group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                      className={`group relative flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 ${
                         isActive
-                          ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-600/30 font-bold border border-emerald-400/30'
-                          : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                          ? 'bg-white/[0.07] text-white font-semibold border border-white/[0.1] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                          : 'text-slate-400 hover:bg-white/[0.035] hover:text-slate-200 hover:translate-x-0.5'
                       }`}
                     >
+                      {isActive && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-4 rounded-r-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]" />
+                      )}
                       <div className="flex items-center space-x-3 truncate">
-                        <Icon size={16} className={`shrink-0 transition-transform group-hover:scale-110 ${
-                          isActive ? 'text-white' : 'text-slate-400 group-hover:text-emerald-400'
+                        <Icon size={15} className={`shrink-0 transition-transform duration-200 group-hover:scale-105 ${
+                          isActive ? 'text-emerald-400' : 'text-slate-400 group-hover:text-slate-200'
                         }`} />
                         <span className="truncate">{item.name}</span>
                       </div>
                       {item.badge && (
-                        <span className="ml-2 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500 text-slate-950 flex items-center space-x-1 shrink-0">
+                        <span className="ml-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center space-x-1 shrink-0">
                           <AlertTriangle size={10} />
                           <span>{item.badge}</span>
                         </span>
@@ -380,24 +452,24 @@ export default function ClientLayout({ children }) {
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-slate-800/80 bg-[#0B1222]/40 text-center">
-          <div className="text-[11px] font-medium text-slate-400 flex items-center justify-center space-x-1">
-            <Sparkles size={12} className="text-emerald-400" />
-            <span>Zenith POS v2.0</span>
+        <div className="p-4 border-t border-white/[0.07] text-center">
+          <div className="text-[11px] font-medium text-slate-400 flex items-center justify-center space-x-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>Zenith Architecture</span>
           </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">SME Digital Transformation</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">Unified Point of Sale</div>
         </div>
       </aside>
 
       {/* Mobile Top Navigation */}
-      <div className="md:hidden bg-[#090E1A] text-white p-4 flex items-center justify-between shadow-md z-20 border-b border-slate-800 print:hidden">
+      <div className="md:hidden bg-[#0B0D11]/95 backdrop-blur-xl text-white p-4 flex items-center justify-between z-20 border-b border-white/[0.08] print:hidden">
         <div className="flex items-center space-x-2.5">
-          <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center font-bold text-white text-sm shadow-md">
+          <div className="w-8 h-8 rounded-lg bg-[#141820] border border-white/15 flex items-center justify-center font-bold text-emerald-400 text-sm">
             Z
           </div>
           <div>
             <span className="font-bold text-sm tracking-tight block">Zenith POS</span>
-            <span className="text-[10px] text-emerald-400 uppercase font-semibold">
+            <span className="text-[10px] text-slate-400 uppercase font-medium">
               {user ? (user.role === 'management' ? 'Admin' : 'Kasir') : ''}
             </span>
           </div>
@@ -406,14 +478,14 @@ export default function ClientLayout({ children }) {
           {user && (
             <button
               onClick={handleLogout}
-              className="px-2.5 py-1.5 bg-rose-900/60 hover:bg-rose-800 text-rose-200 rounded-lg text-xs font-semibold"
+              className="px-2.5 py-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/25 rounded-lg text-xs font-semibold transition"
             >
               Keluar
             </button>
           )}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="text-slate-300 hover:text-white p-2 rounded-lg bg-slate-800 text-xs font-semibold"
+            className="text-slate-300 hover:text-white p-2 rounded-lg bg-white/[0.06] border border-white/10 text-xs font-semibold transition"
           >
             {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -422,10 +494,10 @@ export default function ClientLayout({ children }) {
 
       {/* Mobile Dropdown Menu with Grouped Sections */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#090E1A] text-white border-t border-slate-800 p-4 space-y-4 shadow-xl z-20 max-h-[80vh] overflow-y-auto">
+        <div className="md:hidden bg-[#0B0D11] text-white border-t border-white/[0.08] p-4 space-y-4 shadow-xl z-20 max-h-[80vh] overflow-y-auto animate-fadeIn">
           {navigationSections.map((section, idx) => (
             <div key={idx} className="space-y-1.5">
-              <div className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              <div className="px-2 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
                 {section.title}
               </div>
               <div className="space-y-1">
@@ -437,16 +509,16 @@ export default function ClientLayout({ children }) {
                       key={item.name}
                       href={item.href}
                       onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold ${
-                        isActive ? 'bg-emerald-600 text-white font-bold' : 'text-slate-300 hover:bg-slate-800'
+                      className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
+                        isActive ? 'bg-white/[0.08] text-white border border-white/10' : 'text-slate-400 hover:bg-white/[0.04]'
                       }`}
                     >
                       <div className="flex items-center space-x-3">
-                        <Icon size={16} />
+                        <Icon size={16} className={isActive ? 'text-emerald-400' : 'text-slate-400'} />
                         <span>{item.name}</span>
                       </div>
                       {item.badge && (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500 text-slate-950">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-300">
                           {item.badge}
                         </span>
                       )}
@@ -460,40 +532,51 @@ export default function ClientLayout({ children }) {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-h-screen overflow-y-auto">
-        <header className="bg-[#121816] border-b border-[#1e2a26] px-8 py-3.5 hidden md:flex items-center justify-between shadow-xs z-10 sticky top-0 print:hidden">
-          <div className="text-xs font-medium text-[#94a3b8] flex items-center space-x-2">
-            <span>Sesi Aktif:</span>
+      <main className="flex-1 flex flex-col min-h-screen overflow-y-auto relative">
+        {/* Subtle Architectural Dot Grid & Ambient Vignette */}
+        <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden print:hidden">
+          <div className="zenith-bg-grid absolute inset-0 opacity-50" />
+          <div className="animate-aurora absolute -top-40 right-1/3 h-96 w-96 rounded-full bg-emerald-500/[0.045] blur-3xl" />
+        </div>
+
+        <header className="bg-[#08090C]/80 backdrop-blur-xl border-b border-white/[0.07] px-8 py-3.5 hidden md:flex items-center justify-between z-10 sticky top-0 print:hidden">
+          <div className="text-xs font-medium text-slate-400 flex items-center space-x-2.5">
+            <span>Workspace</span>
+            <span className="text-slate-600">/</span>
             {user && (
               <>
-                <span className="font-bold text-[#f0fdf4]">{user.username}</span>
-                <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
-                  user.role === 'management'
-                    ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
-                    : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
-                }`}>
-                  {user.role === 'management' ? 'Administrator' : 'Kasir'}
+                <span className="font-semibold text-white">{user.username}</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase bg-white/[0.05] text-slate-300 border border-white/10">
+                  {user.role === 'management' ? 'Admin' : 'Kasir'}
                 </span>
               </>
             )}
           </div>
-          <div className="flex items-center space-x-4">
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
-              Sistem Aktif & Terhubung
+          <div className="flex items-center space-x-3">
+            {liveTime && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-mono font-medium bg-white/[0.03] text-slate-300 border border-white/[0.08]">
+                {liveTime} WIB
+              </span>
+            )}
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-medium bg-emerald-500/[0.08] text-emerald-300 border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 animate-pulse"></span>
+              Online
             </span>
             {user && (
               <button
                 onClick={handleLogout}
-                className="text-xs font-semibold text-rose-300 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/15 px-3 py-1.5 rounded-lg transition"
+                className="text-xs font-medium text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] px-3 py-1.5 rounded-lg transition"
               >
-                Keluar (Logout)
+                Keluar
               </button>
             )}
           </div>
         </header>
 
-        <div className="flex-1 p-6 md:p-10 lg:p-12 max-w-7xl 2xl:max-w-[1700px] w-full mx-auto print:p-0 print:max-w-none">
+        <div
+          key={pathname}
+          className="zenith-page-enter relative z-1 flex-1 p-6 md:p-10 lg:p-12 max-w-7xl 2xl:max-w-[1700px] w-full mx-auto print:p-0 print:max-w-none"
+        >
           {children}
         </div>
       </main>

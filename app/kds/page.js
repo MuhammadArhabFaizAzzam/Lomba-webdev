@@ -108,19 +108,19 @@ export default function KDSPage() {
         </header>
 
         {filteredOrders.length === 0 ? (
-          <div className="text-center py-20 bg-slate-900/50 border border-slate-800/80 rounded-3xl backdrop-blur-sm">
+          <div className="text-center py-20 bg-[#11141B] border border-white/[0.08] rounded-3xl backdrop-blur-sm animate-fadeIn">
             <Utensils className="mx-auto h-12 w-12 text-[#94a3b8] mb-4" />
             <h3 className="text-lg font-bold text-white">Tidak ada pesanan aktif</h3>
             <p className="text-slate-400 text-sm mt-1">Pesanan baru dari kasir akan langsung muncul di sini secara real-time.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 stagger-grid">
             {filteredOrders.map((order) => (
               <div
                 key={order.id}
-                className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between relative overflow-hidden"
+                className="spotlight-card bg-[#11141B] border border-white/[0.08] rounded-2xl p-6 shadow-xl flex flex-col justify-between relative overflow-hidden"
               >
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-amber-400" />
+                <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent" />
                 
                 <div>
                   <div className="flex items-center justify-between mb-4">

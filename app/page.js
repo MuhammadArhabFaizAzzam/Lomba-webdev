@@ -246,16 +246,16 @@ export default function Dashboard() {
   return (
     <div className="dashboard-wrap text-slate-100">
       {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce">
+        <div className="zenith-toast fixed top-5 right-5 z-50 bg-slate-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold border border-emerald-500/40">
           {toastMessage}
         </div>
       )}
 
       {/* Low Stock Alert Banner (Clickable) */}
       {lowStockCount > 0 && (
-        <Link href="/inventory?filter=low" className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 flex items-center justify-between shadow-lg hover:bg-amber-500/15 transition group">
+        <Link href="/inventory?filter=low" className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/35 text-amber-300 flex items-center justify-between shadow-lg hover:bg-amber-500/15 hover:-translate-y-0.5 transition-all duration-200 group">
           <div className="flex items-center space-x-3">
-            <AlertTriangle size={22} className="text-amber-400 shrink-0" />
+            <AlertTriangle size={22} className="text-amber-400 shrink-0 animate-pulse" />
             <div>
               <p className="font-bold text-sm">Perhatian: {lowStockCount} Produk Menipis/Habis!</p>
               <p className="text-xs text-amber-200/80">Klik di sini untuk segera lakukan restock barang di menu Manajemen Stok.</p>
@@ -388,11 +388,26 @@ export default function Dashboard() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
-                  <CartesianGrid stroke="rgba(148, 163, 184, 0.15)" vertical={false} />
+                  <defs>
+                    <linearGradient id="zenithLineGradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#10B981" />
+                      <stop offset="50%" stopColor="#34D399" />
+                      <stop offset="100%" stopColor="#38BDF8" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="rgba(148, 163, 184, 0.14)" vertical={false} />
                   <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#94A3B8', fontSize: 11 }} />
                   <YAxis tickLine={false} axisLine={false} tick={{ fill: '#94A3B8', fontSize: 11 }} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="value" stroke="#8B5CF6" strokeWidth={3} dot={{ r: 4, fill: '#38BDF8' }} activeDot={{ r: 6, fill: '#34D399' }} />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="url(#zenithLineGradient)"
+                    strokeWidth={3.5}
+                    dot={{ r: 4, fill: '#10B981', strokeWidth: 2, stroke: '#090c0b' }}
+                    activeDot={{ r: 7, fill: '#34D399', stroke: '#fff', strokeWidth: 2 }}
+                    animationDuration={900}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -410,15 +425,15 @@ export default function Dashboard() {
           </div>
 
           {quickActions.map(({ label, value, icon: Icon, href }) => (
-            <Link key={label} href={href} className="quick-card hover:bg-slate-800/40 p-2 rounded-xl transition block text-inherit no-underline">
+            <Link key={label} href={href} className="quick-card group hover:bg-slate-800/40 p-2.5 rounded-xl transition-all duration-200 block text-inherit no-underline hover:translate-x-1">
               <div className="quick-meta">
-                <span className="quick-badge"><Icon size={16} /></span>
+                <span className="quick-badge transition-transform duration-200 group-hover:scale-110"><Icon size={16} /></span>
                 <div>
                   <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{label}</div>
                   <div className="quick-value">{value}</div>
                 </div>
               </div>
-              <ArrowUpRight size={14} color="var(--text-tertiary)" />
+              <ArrowUpRight size={14} className="text-[#94a3b8] transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-emerald-300" />
             </Link>
           ))}
         </div>
@@ -473,18 +488,30 @@ export default function Dashboard() {
                 Belum ada data produk terjual.
               </div>
             ) : (
-              topSellingProducts.map((p, idx) => (
-                <div key={p.name} className="flex items-center justify-between p-2.5 bg-slate-800/40 rounded-xl border border-slate-700/60 text-xs">
-                  <div className="flex items-center space-x-2.5 truncate">
-                    <span className="w-5 h-5 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
-                    <span className="font-bold text-white truncate">{p.name}</span>
+              topSellingProducts.map((p, idx) => {
+                const maxQty = Math.max(1, topSellingProducts[0]?.qty || 1);
+                const pct = Math.min(100, Math.round((p.qty / maxQty) * 100));
+                return (
+                  <div key={p.name} className="p-2.5 bg-slate-800/40 hover:bg-slate-800/70 rounded-xl border border-slate-700/60 hover:border-emerald-500/35 text-xs transition-all duration-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2.5 truncate">
+                        <span className="w-5 h-5 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
+                        <span className="font-bold text-white truncate">{p.name}</span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-bold text-emerald-400">{p.qty} terjual</div>
+                        <div className="text-[10px] text-slate-400">{formatRupiah(p.revenue)}</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-950/70">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-300 transition-all duration-700"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-bold text-emerald-400">{p.qty} terjual</div>
-                    <div className="text-[10px] text-slate-400">{formatRupiah(p.revenue)}</div>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

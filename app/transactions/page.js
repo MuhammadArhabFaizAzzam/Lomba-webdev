@@ -293,7 +293,7 @@ export default function TransactionsPage() {
   return (
     <div className="page-stack">
       {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce">
+        <div className="fixed top-5 right-5 z-50 zenith-toast text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold">
           {toastMessage}
         </div>
       )}
@@ -308,7 +308,7 @@ export default function TransactionsPage() {
           <button
             onClick={exportToCSV}
             disabled={filteredTransactions.length === 0}
-            className="w-full sm:w-auto flex items-center justify-center space-x-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-xl shadow-md shadow-emerald-600/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto flex items-center justify-center space-x-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-xl shadow-md shadow-emerald-600/20 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -319,48 +319,48 @@ export default function TransactionsPage() {
       </div>
 
       {/* Summary Cards Above Table (Clickable as filters) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:hidden">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:hidden stagger-grid">
         <div
           onClick={() => { setStatusFilter('Semua'); setMethodFilter('Semua'); }}
-          className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
+          className="spotlight-card bg-[#11141B] border border-white/[0.08] rounded-2xl p-4 shadow-sm cursor-pointer group"
         >
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block group-hover:text-emerald-400 transition">Total Tercatat</span>
           <div className="flex items-baseline justify-between mt-1">
-            <span className="text-2xl font-extrabold text-white">{formatRupiah(summary.totalRecorded)}</span>
-            <span className="text-xs text-slate-400 font-semibold">{summary.totalCount} Trx</span>
+            <span className="text-2xl font-extrabold font-mono text-white">{formatRupiah(summary.totalRecorded)}</span>
+            <span className="text-xs font-mono text-slate-400 font-semibold">{summary.totalCount} Trx</span>
           </div>
         </div>
 
         <div
           onClick={() => setStatusFilter('Lunas')}
-          className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
+          className="spotlight-card bg-[#11141B] border border-white/[0.08] rounded-2xl p-4 shadow-sm cursor-pointer group"
         >
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block group-hover:text-emerald-400 transition">Sudah Lunas (Masuk)</span>
           <div className="flex items-baseline justify-between mt-1">
-            <span className="text-2xl font-extrabold text-emerald-400">{formatRupiah(summary.totalPaid)}</span>
-            <span className="text-xs text-slate-400 font-semibold">Hari Ini: {formatRupiah(summary.todayPaidRevenue)}</span>
+            <span className="text-2xl font-extrabold font-mono text-emerald-400">{formatRupiah(summary.totalPaid)}</span>
+            <span className="text-xs font-mono text-slate-400 font-semibold">Hari Ini: {formatRupiah(summary.todayPaidRevenue)}</span>
           </div>
         </div>
 
         <div
           onClick={() => setMethodFilter('QRIS')}
-          className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
+          className="spotlight-card bg-[#11141B] border border-white/[0.08] rounded-2xl p-4 shadow-sm cursor-pointer group"
         >
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block group-hover:text-emerald-400 transition">Total QRIS</span>
           <div className="flex items-baseline justify-between mt-1">
-            <span className="text-xl font-extrabold text-emerald-400">{summary.qrisPaidCount} Lunas, {summary.qrisPendingCount} Menunggu</span>
-            <span className="text-xs text-slate-400 font-semibold">{summary.qrisTotal} Total</span>
+            <span className="text-xl font-extrabold font-mono text-emerald-400">{summary.qrisPaidCount} Lunas, {summary.qrisPendingCount} Menunggu</span>
+            <span className="text-xs font-mono text-slate-400 font-semibold">{summary.qrisTotal} Total</span>
           </div>
         </div>
 
         <div
           onClick={() => setStatusFilter('Menunggu')}
-          className="bg-slate-900/80 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-4 shadow-sm cursor-pointer transition group"
+          className="spotlight-card bg-[#11141B] border border-white/[0.08] rounded-2xl p-4 shadow-sm cursor-pointer group"
         >
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block group-hover:text-amber-400 transition">Masih Menunggu (Pending)</span>
           <div className="flex items-baseline justify-between mt-1">
-            <span className="text-2xl font-extrabold text-amber-400">{formatRupiah(summary.totalPending)}</span>
-            <span className="text-xs text-amber-300 font-semibold">{summary.pendingCount} Trx</span>
+            <span className="text-2xl font-extrabold font-mono text-amber-400">{formatRupiah(summary.totalPending)}</span>
+            <span className="text-xs font-mono text-amber-300 font-semibold">{summary.pendingCount} Trx</span>
           </div>
         </div>
       </div>

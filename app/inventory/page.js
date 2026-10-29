@@ -475,23 +475,23 @@ export default function InventoryPage() {
   const getStockBadge = (stock) => {
     if (stock === 0) {
       return (
-        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-300 border border-rose-500/30 flex items-center w-max space-x-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
+        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30 flex items-center w-max space-x-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span>
           <span>Stok Kosong</span>
         </span>
       );
     }
     if (stock >= 1 && stock <= LOW_STOCK_MAX) {
       return (
-        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center w-max space-x-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center w-max space-x-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
           <span>Stok Menipis</span>
         </span>
       );
     }
     return (
-      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center w-max space-x-1.5">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center w-max space-x-1.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
         <span>Stok Normal</span>
       </span>
     );
@@ -500,8 +500,8 @@ export default function InventoryPage() {
   return (
     <div className="space-y-6 animate-fadeIn relative">
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 text-xs font-bold animate-bounce">
-          <Info size={16} className="text-indigo-400 shrink-0" />
+        <div className="fixed bottom-6 right-6 z-50 zenith-toast text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 text-xs font-bold">
+          <Info size={16} className="text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -514,14 +514,14 @@ export default function InventoryPage() {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={exportInventoryCSV}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-600/20 transition flex items-center space-x-2"
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-600/20 hover:-translate-y-0.5 transition-all flex items-center space-x-2"
           >
             <Download size={15} />
             <span>Export CSV</span>
           </button>
           <button
             onClick={() => setShowPresetModal(true)}
-            className="bg-emerald-700 hover:bg-emerald-600 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-700/20 transition flex items-center space-x-2"
+            className="bg-emerald-700 hover:bg-emerald-600 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-700/20 hover:-translate-y-0.5 transition-all flex items-center space-x-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -530,7 +530,7 @@ export default function InventoryPage() {
           </button>
           <button
             onClick={promptReset}
-            className="bg-slate-200 hover:bg-slate-300 text-[#f0fdf4] font-semibold px-4 py-2.5 rounded-xl text-xs transition"
+            className="bg-[#121816] hover:bg-rose-500/15 text-[#94a3b8] hover:text-rose-300 border border-[#1e2a26] hover:border-rose-500/30 font-semibold px-4 py-2.5 rounded-xl text-xs transition-all"
           >
             Reset Data (0)
           </button>
@@ -541,38 +541,38 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#121816] p-5 rounded-2xl border border-[#1e2a26] shadow-xs flex items-center justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger-grid">
+        <div className="spotlight-card bg-[#11141B] p-5 rounded-2xl border border-white/[0.08] shadow-xs flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Produk</p>
-            <h3 className="text-2xl font-extrabold text-[#f0fdf4] mt-1">{products.length}</h3>
+            <h3 className="text-2xl font-extrabold font-mono text-white mt-1">{products.length}</h3>
             <span className="text-xs text-emerald-300 font-semibold mt-1 inline-block">Item terdaftar</span>
           </div>
-          <div className="w-12 h-12 bg-emerald-500/10 text-emerald-300 rounded-2xl flex items-center justify-center font-bold text-xl">
+          <div className="w-12 h-12 bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 rounded-2xl flex items-center justify-center font-bold text-xl">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
           </div>
         </div>
-        <div className="bg-[#121816] p-5 rounded-2xl border border-[#1e2a26] shadow-xs flex items-center justify-between">
+        <div className="spotlight-card bg-[#11141B] p-5 rounded-2xl border border-white/[0.08] shadow-xs flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Stok Menipis</p>
-            <h3 className="text-2xl font-extrabold text-amber-600 mt-1">{products.filter((p) => p.stock > 0 && p.stock <= LOW_STOCK_MAX).length}</h3>
-            <span className="text-xs text-amber-600 font-semibold mt-1 inline-block">Perlu restock</span>
+            <h3 className="text-2xl font-extrabold font-mono text-amber-400 mt-1">{products.filter((p) => p.stock > 0 && p.stock <= LOW_STOCK_MAX).length}</h3>
+            <span className="text-xs text-amber-300 font-semibold mt-1 inline-block">Perlu restock</span>
           </div>
-          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center font-bold text-xl">
+          <div className="w-12 h-12 bg-amber-500/15 text-amber-300 border border-amber-500/25 rounded-2xl flex items-center justify-center font-bold text-xl">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
         </div>
-        <div className="bg-[#121816] p-5 rounded-2xl border border-[#1e2a26] shadow-xs flex items-center justify-between">
+        <div className="spotlight-card bg-[#11141B] p-5 rounded-2xl border border-white/[0.08] shadow-xs flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Stok Kosong</p>
-            <h3 className="text-2xl font-extrabold text-rose-300 mt-1">{products.filter((p) => p.stock === 0).length}</h3>
+            <h3 className="text-2xl font-extrabold font-mono text-rose-300 mt-1">{products.filter((p) => p.stock === 0).length}</h3>
             <span className="text-xs text-rose-300 font-semibold mt-1 inline-block">Habis total</span>
           </div>
-          <div className="w-12 h-12 bg-rose-500/10 text-rose-300 rounded-2xl flex items-center justify-center font-bold text-xl">
+          <div className="w-12 h-12 bg-rose-500/15 text-rose-300 border border-rose-500/20 rounded-2xl flex items-center justify-center font-bold text-xl">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
@@ -581,9 +581,9 @@ export default function InventoryPage() {
       </div>
 
       {onlyLowStock && (
-        <div className="mb-4 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl flex items-center justify-between">
+        <div className="mb-4 p-3.5 bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs rounded-xl flex items-center justify-between">
           <span className="font-medium">Menampilkan produk dengan stok menipis atau habis (≤ {LOW_STOCK_MAX} pcs), sama dengan peringatan di dashboard.</span>
-          <button onClick={() => { setOnlyLowStock(false); setStockStatusFilter('Semua'); }} className="font-bold underline px-2 py-1 bg-amber-100 hover:bg-amber-200 rounded-lg transition">Tampilkan Semua Produk</button>
+          <button onClick={() => { setOnlyLowStock(false); setStockStatusFilter('Semua'); }} className="font-bold underline px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 rounded-lg transition">Tampilkan Semua Produk</button>
         </div>
       )}
 
@@ -686,7 +686,7 @@ export default function InventoryPage() {
                         </button>
                         <button
                           onClick={() => { setRestockProduct(p); setRestockAmount('10'); setShowRestockModal(true); }}
-                          className="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-100 text-emerald-300 text-[10px] font-bold rounded shadow-2xs transition ml-1"
+                          className="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/20 text-[10px] font-bold rounded shadow-2xs transition ml-1"
                           title="Restock Massal"
                         >
                           Restock +
@@ -696,13 +696,13 @@ export default function InventoryPage() {
                     <td className="py-4 px-6 text-right space-x-2">
                       <button
                         onClick={() => handleOpenEdit(p)}
-                        className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-100 text-emerald-300 font-semibold rounded-lg text-xs transition"
+                        className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/20 font-semibold rounded-lg text-xs transition"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => promptDelete(p.id)}
-                        className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/15 text-rose-300 font-semibold rounded-lg text-xs transition"
+                        className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/25 text-rose-300 border border-rose-500/20 font-semibold rounded-lg text-xs transition"
                       >
                         Hapus
                       </button>
@@ -718,7 +718,7 @@ export default function InventoryPage() {
       {/* Preset Modal */}
       {showPresetModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-[#121816] rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-[#1e2a26]">
+          <div className="modal-card bg-[#121816] rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-[#1e2a26]">
             <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#1e2a26]">
               <div>
                 <h3 className="text-lg font-bold text-[#f0fdf4]">Preset Data Retail Instan</h3>
@@ -737,7 +737,7 @@ export default function InventoryPage() {
                         <div>
                           <div className="flex items-start justify-between gap-2">
                             <h4 className="font-bold text-[#f0fdf4] text-sm group-hover:text-emerald-300 transition">{preset.name}</h4>
-                            <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-300 font-bold text-[10px] uppercase">Custom</span>
+                            <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold text-[10px] uppercase">Custom</span>
                           </div>
                           <p className="text-xs text-[#94a3b8] mt-1 leading-relaxed">{preset.description}</p>
                           <span className="inline-block mt-3 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 font-semibold text-[11px]">

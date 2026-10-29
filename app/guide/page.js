@@ -63,43 +63,39 @@ export default function GuidePage() {
   return (
     <div className="space-y-8 animate-fadeIn max-w-5xl mx-auto py-4">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-2xl p-6 md:p-8 text-white shadow-xl border border-slate-800">
-        <span className="bg-emerald-500/30 text-emerald-200 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
+      <div className="spotlight-card bg-[#11141B] rounded-2xl p-6 md:p-8 text-white shadow-xl border border-white/[0.08]">
+        <span className="bg-white/[0.05] text-emerald-300 border border-white/[0.1] font-mono text-[10px] font-semibold px-3 py-1 rounded-full uppercase tracking-[0.16em]">
           Panduan Evaluasi Juri
         </span>
-        <h2 className="text-2xl md:text-3xl font-bold mt-2">Panduan Penggunaan &amp; Fitur Zenith POS</h2>
-        <p className="text-slate-300 text-sm md:text-base mt-2">
+        <h2 className="text-2xl md:text-3xl font-extrabold mt-3 tracking-tight">Panduan Penggunaan &amp; Fitur Zenith POS</h2>
+        <p className="text-slate-400 text-sm md:text-base mt-2 leading-relaxed">
           Dokumentasi alur pengujian end-to-end untuk memudahkan dewan juri mengeksplorasi seluruh ekosistem transformasi digital UMKM pada Zenith POS v2.0.
         </p>
       </div>
 
       {/* Steps Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 stagger-grid">
         {modules.map((mod) => (
           <div
             key={mod.step}
-            className="bg-[#121816] p-6 rounded-2xl border border-[#1e2a26] shadow-xs flex flex-col justify-between hover:border-emerald-300 transition"
+            className="spotlight-card bg-[#11141B] p-6 rounded-2xl border border-white/[0.08] shadow-xs flex flex-col justify-between group"
           >
             <div>
               <div
-                className={`w-10 h-10 rounded-xl font-bold flex items-center justify-center text-lg mb-4 ${
+                className={`w-10 h-10 rounded-xl font-mono font-bold flex items-center justify-center text-sm mb-4 transition-transform duration-300 group-hover:scale-105 ${
                   mod.tone === 'amber'
-                    ? 'bg-amber-50 text-amber-600 border border-amber-200/60'
-                    : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
+                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                    : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                 }`}
               >
-                {mod.step}
+                0{mod.step}
               </div>
-              <h3 className="text-lg font-bold text-[#f0fdf4] mb-2">{mod.title}</h3>
-              <p className="text-[#94a3b8] text-sm mb-5 leading-relaxed">{mod.description}</p>
+              <h3 className="text-base font-bold text-white mb-2 group-hover:text-emerald-300 transition-colors">{mod.title}</h3>
+              <p className="text-slate-400 text-xs mb-5 leading-relaxed">{mod.description}</p>
             </div>
             <Link
               href={mod.href}
-              className={`inline-flex items-center justify-center py-2.5 px-4 text-white rounded-xl text-xs font-semibold transition ${
-                mod.tone === 'amber'
-                  ? 'bg-amber-600 hover:bg-amber-500'
-                  : 'bg-emerald-600 hover:bg-emerald-500'
-              }`}
+              className="inline-flex items-center justify-center py-2.5 px-4 bg-white/[0.05] hover:bg-emerald-500 text-slate-200 hover:text-slate-950 border border-white/[0.09] hover:border-emerald-400 rounded-xl text-xs font-bold transition-all"
             >
               {mod.buttonText}
             </Link>
