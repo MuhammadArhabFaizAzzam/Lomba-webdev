@@ -588,7 +588,7 @@ export default function POSPage() {
   return (
     <div className="pos-shell">
       {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce">
+        <div className="zenith-toast fixed top-5 right-5 z-50 bg-slate-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold border border-emerald-500/40">
           {toastMessage}
         </div>
       )}
@@ -770,9 +770,10 @@ export default function POSPage() {
               ID Transaksi: <span style={{ fontFamily: 'monospace', color: 'var(--accent-secondary)' }}>{activeQrisOrder.id}</span>
             </p>
 
-            <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', display: 'inline-block', marginBottom: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)', opacity: activeQrisOrder.status === 'EXPIRED' ? 0.5 : 1 }}>
-              <div style={{ width: '180px', height: '180px', border: '4px solid #0f172a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: '10px', margin: '0 auto' }}>
-                <QrCode size={110} className="text-[#f0fdf4]" />
+            <div style={{ background: '#fff', padding: '20px', borderRadius: '18px', display: 'inline-block', marginBottom: '16px', boxShadow: '0 14px 32px rgba(0,0,0,0.45), 0 0 24px rgba(16,185,129,0.2)', opacity: activeQrisOrder.status === 'EXPIRED' ? 0.5 : 1 }}>
+              <div style={{ position: 'relative', overflow: 'hidden', width: '180px', height: '180px', border: '4px solid #0f172a', borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: '10px', margin: '0 auto' }}>
+                {activeQrisOrder.status !== 'EXPIRED' && <div className="qris-laser-line" />}
+                <QrCode size={110} className="text-slate-900" />
                 <span style={{ fontSize: '9px', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>STANDAR QRIS</span>
               </div>
             </div>
@@ -909,28 +910,44 @@ export default function POSPage() {
           ) : (
             filteredProducts.map((product) => {
               const isOutOfStock = product.stock <= 0;
+              const inCartItem = cart.find((item) => item.id === product.id);
+              const inCartQty = inCartItem ? inCartItem.qty : 0;
               return (
                 <div
                   key={product.id}
                   onClick={() => addToCart(product)}
-                  className={`product-card ${isOutOfStock ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  className={`product-card group ${isOutOfStock ? 'opacity-60 cursor-not-allowed' : ''} ${inCartQty > 0 ? 'ring-1 ring-emerald-400/60 border-emerald-400/50' : ''}`}
                 >
                   <div className="product-top">
                     <span className="product-category">{product.category}</span>
-                    <span
-                      className="product-stock"
-                      style={{
-                        background: product.stock === 0 ? 'rgba(248, 113, 113, 0.15)' : product.stock <= 10 ? 'rgba(251, 191, 36, 0.15)' : 'rgba(52, 211, 153, 0.15)',
-                        color: product.stock === 0 ? 'var(--danger)' : product.stock <= 10 ? 'var(--warning)' : 'var(--success)',
-                      }}
-                    >
-                      {product.stock === 0 ? 'Habis' : `${product.stock} stok`}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {inCartQty > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500 text-slate-950 shadow-sm animate-fadeIn">
+                          {inCartQty}x
+                        </span>
+                      )}
+                      <span
+                        className="product-stock"
+                        style={{
+                          background: product.stock === 0 ? 'rgba(248, 113, 113, 0.15)' : product.stock <= 10 ? 'rgba(251, 191, 36, 0.15)' : 'rgba(52, 211, 153, 0.15)',
+                          color: product.stock === 0 ? 'var(--danger)' : product.stock <= 10 ? 'var(--warning)' : 'var(--success)',
+                        }}
+                      >
+                        {product.stock === 0 ? 'Habis' : `${product.stock} stok`}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="product-body">
-                    <h4 className="product-name">{formatProductName(product.name)}</h4>
-                    <span className="product-price">{formatRupiah(product.price)}</span>
+                    <h4 className="product-name group-hover:text-emerald-300 transition-colors">{formatProductName(product.name)}</h4>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="product-price">{formatRupiah(product.price)}</span>
+                      {!isOutOfStock && (
+                        <span className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 flex items-center justify-center opacity-70 group-hover:opacity-100 group-hover:bg-emerald-500 group-hover:text-slate-950 transition-all duration-200 group-hover:scale-110">
+                          <Plus size={14} />
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

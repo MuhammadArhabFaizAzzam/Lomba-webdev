@@ -139,29 +139,29 @@ export default function SuppliersPage() {
   return (
     <div className="space-y-6 text-slate-100">
       {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce">
+        <div className="fixed top-5 right-5 z-50 zenith-toast text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold">
           {toastMessage}
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-[#0B1222] p-6 rounded-2xl border border-slate-800 shadow-xl">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-[#11141B] p-6 rounded-2xl border border-white/[0.08] shadow-xl">
         <div>
-          <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">Supply Chain & Inventory Procurement</span>
-          <h1 className="text-2xl font-black text-white mt-1">Manajemen Supplier & Purchase Order (PO)</h1>
+          <span className="font-mono text-[10px] font-semibold text-emerald-400 uppercase tracking-[0.16em]">Supply Chain &amp; Inventory Procurement</span>
+          <h1 className="text-2xl font-extrabold text-white mt-1 tracking-tight">Manajemen Supplier &amp; Purchase Order (PO)</h1>
           <p className="text-xs text-slate-400 mt-0.5">Kelola daftar vendor pemasok barang dan buat pesanan pembelian saat stok gudang menipis.</p>
         </div>
         <div className="flex items-center space-x-3">
           <button
             onClick={() => setShowSupplierModal(true)}
-            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition flex items-center space-x-2 border border-slate-700"
+            className="px-4 py-2.5 bg-white/[0.05] hover:bg-white/[0.1] text-slate-200 text-xs font-semibold rounded-xl hover:-translate-y-0.5 transition-all flex items-center space-x-2 border border-white/[0.1]"
           >
             <Building size={16} className="text-emerald-400" />
             <span>Tambah Supplier</span>
           </button>
           <button
             onClick={() => setShowPoModal(true)}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition flex items-center space-x-2 shadow-lg shadow-emerald-600/20"
+            className="btn-primary px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl hover:-translate-y-0.5 transition-all flex items-center space-x-2 shadow-lg shadow-emerald-500/20"
           >
             <Plus size={16} />
             <span>Buat Purchase Order (PO)</span>
@@ -171,16 +171,16 @@ export default function SuppliersPage() {
 
       {/* Supplier Cards Grid */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wider">Daftar Supplier / Vendor Terdaftar</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Daftar Supplier / Vendor Terdaftar</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 stagger-grid">
           {suppliers.map((s) => (
-            <div key={s.id} className="bg-[#0B1222] border border-slate-800 p-5 rounded-2xl shadow-lg flex items-start justify-between">
+            <div key={s.id} className="spotlight-card bg-[#11141B] border border-white/[0.08] p-5 rounded-2xl shadow-lg flex items-start justify-between">
               <div className="space-y-1">
-                <div className="flex items-center space-x-2">
-                  <span className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs"><Truck size={16} /></span>
+                <div className="flex items-center space-x-2.5">
+                  <span className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] text-emerald-400 flex items-center justify-center font-bold text-xs"><Truck size={15} /></span>
                   <h4 className="font-bold text-white text-sm">{s.name}</h4>
                 </div>
-                <p className="text-xs text-slate-400 pl-10">Kontak: <span className="text-slate-200 font-semibold">{s.contact}</span> ({s.phone})</p>
+                <p className="text-xs text-slate-400 pl-10">Kontak: <span className="text-slate-200 font-semibold">{s.contact}</span> (<span className="font-mono">{s.phone}</span>)</p>
                 <p className="text-xs text-[#94a3b8] pl-10">{s.address}</p>
               </div>
             </div>
@@ -190,12 +190,12 @@ export default function SuppliersPage() {
 
       {/* Purchase Orders Table */}
       <div className="space-y-3 pt-4">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wider">Riwayat Purchase Order (PO)</h3>
-        <div className="bg-[#0B1222] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Riwayat Purchase Order (PO)</h3>
+        <div className="bg-[#11141B] border border-white/[0.08] rounded-2xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-900/80 text-slate-400 border-b border-slate-800">
+                <tr className="bg-[#0B0D11] text-slate-400 border-b border-white/[0.07]">
                   <th className="p-4 font-bold">ID PO</th>
                   <th className="p-4 font-bold">Tanggal</th>
                   <th className="p-4 font-bold">Supplier</th>
@@ -255,8 +255,8 @@ export default function SuppliersPage() {
 
       {/* Add Supplier Modal */}
       {showSupplierModal && (
-        <div className="fixed inset-0 bg-[#090c0b]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0B1222] border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="modal-backdrop">
+          <div className="modal-card bg-[#0B1222] border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl">
             <h3 className="text-lg font-bold text-white mb-1">Tambah Supplier Baru</h3>
             <p className="text-xs text-slate-400 mb-5">Masukkan informasi vendor pemasok produk.</p>
 
@@ -324,8 +324,8 @@ export default function SuppliersPage() {
 
       {/* Create PO Modal */}
       {showPoModal && (
-        <div className="fixed inset-0 bg-[#090c0b]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0B1222] border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="modal-backdrop">
+          <div className="modal-card bg-[#0B1222] border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl">
             <h3 className="text-lg font-bold text-white mb-1">Buat Purchase Order (PO)</h3>
             <p className="text-xs text-slate-400 mb-5">Pesan stok barang ke supplier terdaftar.</p>
 

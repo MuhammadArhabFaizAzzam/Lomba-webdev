@@ -94,16 +94,16 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6 text-slate-100">
       {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold border border-slate-700 animate-bounce">
+        <div className="fixed top-5 right-5 z-50 zenith-toast text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold">
           {toastMessage}
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-[#0B1222] p-6 rounded-2xl border border-slate-800 shadow-xl">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-[#11141B] p-6 rounded-2xl border border-white/[0.08] shadow-xl">
         <div>
-          <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">CRM & Member Loyalty</span>
-          <h1 className="text-2xl font-black text-white mt-1">Manajemen Pelanggan</h1>
+          <span className="font-mono text-[10px] font-semibold text-emerald-400 uppercase tracking-[0.16em]">CRM &amp; Member Loyalty</span>
+          <h1 className="text-2xl font-extrabold text-white mt-1 tracking-tight">Manajemen Pelanggan</h1>
           <p className="text-xs text-slate-400 mt-0.5">Kelola data member, poin loyalitas, tier diskon, dan riwayat belanja pelanggan.</p>
         </div>
         <div className="flex items-center space-x-3">
@@ -116,7 +116,7 @@ export default function CustomersPage() {
               setTier('Bronze');
               setShowAddModal(true);
             }}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition flex items-center space-x-2 shadow-lg shadow-emerald-600/20"
+            className="btn-primary px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl hover:-translate-y-0.5 transition-all flex items-center space-x-2 shadow-lg shadow-emerald-500/20"
           >
             <UserPlus size={16} />
             <span>Tambah Pelanggan Baru</span>
@@ -125,55 +125,55 @@ export default function CustomersPage() {
       </div>
 
       {/* Customer List Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 stagger-grid">
         {customers.map((c) => (
-          <div key={c.id} className="bg-[#0B1222] border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between hover:border-slate-700 transition">
+          <div key={c.id} className="spotlight-card bg-[#11141B] border border-white/[0.08] p-5 rounded-2xl shadow-xl flex flex-col justify-between">
             <div>
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-bold text-white text-base">{c.name}</h3>
-                  <p className="text-xs text-slate-400 mt-0.5 flex items-center space-x-1">
+                  <p className="text-xs text-slate-400 mt-0.5 flex items-center space-x-1 font-mono">
                     <Phone size={12} className="text-emerald-400" />
                     <span>{c.phone}</span>
                   </p>
                 </div>
-                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase ${
-                  c.tier === 'Gold' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-                  c.tier === 'Silver' ? 'bg-slate-300/20 text-slate-200 border border-slate-300/30' :
+                <span className={`px-2.5 py-1 rounded-lg font-mono text-[10px] font-bold uppercase ${
+                  c.tier === 'Gold' ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' :
+                  c.tier === 'Silver' ? 'bg-slate-300/15 text-slate-200 border border-slate-300/25' :
                   'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
                 }`}>
                   {c.tier} Member
                 </span>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-2 gap-3 text-xs">
-                <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+              <div className="mt-4 pt-4 border-t border-white/[0.07] grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-[#0B0D11] p-2.5 rounded-xl border border-white/[0.06]">
                   <span className="text-[10px] text-slate-400 block">Poin Loyalitas</span>
-                  <span className="font-bold text-amber-400 flex items-center space-x-1 mt-0.5">
+                  <span className="font-bold font-mono text-amber-400 flex items-center space-x-1 mt-0.5">
                     <Award size={14} />
                     <span>{c.points} Poin</span>
                   </span>
                 </div>
-                <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                <div className="bg-[#0B0D11] p-2.5 rounded-xl border border-white/[0.06]">
                   <span className="text-[10px] text-slate-400 block">Total Belanja</span>
-                  <span className="font-bold text-emerald-400 mt-0.5 block">{formatRupiah(c.totalSpent || 0)}</span>
+                  <span className="font-bold font-mono text-emerald-400 mt-0.5 block">{formatRupiah(c.totalSpent || 0)}</span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+            <div className="mt-5 pt-3 border-t border-white/[0.07] flex items-center justify-between">
               <span className="text-[11px] text-slate-400 truncate max-w-[150px]">{c.email}</span>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => handleEdit(c)}
-                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition"
+                  className="p-1.5 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.08] rounded-lg transition"
                   title="Edit Pelanggan"
                 >
                   <Edit3 size={14} />
                 </button>
                 <button
                   onClick={() => handleDelete(c.id)}
-                  className="p-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-300 rounded-lg transition"
+                  className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 rounded-lg transition"
                   title="Hapus Pelanggan"
                 >
                   <Trash2 size={14} />
@@ -186,8 +186,8 @@ export default function CustomersPage() {
 
       {/* Add / Edit Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-[#090c0b]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0B1222] border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="modal-backdrop">
+          <div className="modal-card bg-[#11141B] border border-white/[0.1] p-6 rounded-2xl w-full max-w-md shadow-2xl">
             <h3 className="text-lg font-bold text-white mb-1">
               {editingCustomer ? 'Edit Pelanggan' : 'Tambah Pelanggan Baru'}
             </h3>
