@@ -153,7 +153,7 @@ export default function LoginPage() {
             <div className="p-4 bg-[#08090C] rounded-2xl border border-white/[0.07] text-xs text-slate-400 space-y-2.5">
               <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
                 <Key size={12} className="text-emerald-400" />
-                <span>Akses Instan Evaluasi (1-Klik):</span>
+                <span>Pilih Peran Akses Cepat:</span>
               </p>
               <button
                 type="button"

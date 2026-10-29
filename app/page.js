@@ -34,7 +34,7 @@ import {
   LabelList,
 } from 'recharts';
 import { formatRupiah } from './utils/formatCurrency';
-import { LOW_STOCK_MAX, ensureInitialCatalog, normalizeProduct, normalizeTransaction, readStoredArray, removeStoredArray, seedDemoSimulationData, transactionGrossProfit } from './utils/storage';
+import { LOW_STOCK_MAX, ensureInitialCatalog, normalizeProduct, normalizeTransaction, readStoredArray, removeStoredArray, transactionGrossProfit } from './utils/storage';
 
 const COLORS = ['#10B981', '#38BDF8', '#34D399', '#FBBF24', '#F87171'];
 
@@ -236,13 +236,6 @@ export default function Dashboard() {
     }
   };
 
-  const handleLoadSimulationData = () => {
-    const { products: seededProducts, transactions: seededTxs } = seedDemoSimulationData();
-    setProducts(seededProducts);
-    setTransactions(seededTxs);
-    showToast('Data simulasi demo (produk & grafik 7 hari) berhasil dimuat!');
-  };
-
   return (
     <div className="dashboard-wrap text-slate-100">
       {toastMessage && (
@@ -291,25 +284,16 @@ export default function Dashboard() {
       {/* Hero Section */}
       <div className="dashboard-hero">
         <div className="hero-copy">
-          <span className="eyebrow">Zenith POS · Business overview</span>
+          <span className="eyebrow">Zenith POS · Business Overview</span>
           <h2>Ambil keputusan dari data toko hari ini.</h2>
           <p>Pantau omzet, transaksi, stok, dan laba kotor dari satu dashboard operasional yang mudah dipahami tim.</p>
         </div>
 
         <div className="hero-actions">
-          <button
-            className="btn-secondary"
-            type="button"
-            onClick={handleLoadSimulationData}
-            title="Isi produk & contoh transaksi 7 hari untuk pengujian grafik"
-          >
-            <PackageCheck size={15} />
-            Isi Data Simulasi
-          </button>
           {isAdmin && (
-            <button className="btn-secondary" type="button" onClick={handleResetData} title="Reset seluruh data demo ke 0">
+            <button className="btn-secondary" type="button" onClick={handleResetData} title="Reset seluruh data ke 0">
               <Plus size={15} />
-              Reset data
+              Reset Data
             </button>
           )}
           <Link href="/pos" className="btn-primary">

@@ -726,13 +726,13 @@ export default function POSPage() {
           <div className="modal-card" style={{ maxWidth: '400px' }}>
             <div className="modal-header">
               <div>
-                <span className="eyebrow" style={{ color: 'var(--accent-primary)' }}>Scanner Simulation</span>
-                <h3>Scan Barcode / QR Produk</h3>
+                <span className="eyebrow" style={{ color: 'var(--accent-primary)' }}>Barcode &amp; SKU Scanner</span>
+                <h3>Pindai Barcode / Kode Produk</h3>
               </div>
               <button onClick={() => setShowScannerModal(false)} className="text-slate-400 hover:text-white"><X size={18} /></button>
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: '10px 0' }}>
-              Simulasikan pemindaian barcode dengan mengetik kode produk atau nama barang secara instan.
+              Masukkan atau pindai kode barcode / nama barang untuk menambahkan langsung ke keranjang.
             </p>
             <form onSubmit={handleScannerSubmit} className="space-y-4">
               <input
@@ -753,12 +753,12 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* Dynamic QRIS Gateway Simulation Modal */}
+      {/* Dynamic QRIS Gateway Modal */}
       {activeQrisOrder && (
         <div className="modal-backdrop">
           <div className="modal-card" style={{ maxWidth: '440px', textAlign: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span className="eyebrow" style={{ color: 'var(--accent-primary)' }}>Midtrans / Xendit Sandbox</span>
+              <span className="eyebrow" style={{ color: 'var(--accent-primary)' }}>QRIS Payment Gateway</span>
               <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${activeQrisOrder.status === 'EXPIRED' ? 'bg-rose-500/20 text-rose-300' : 'bg-amber-500/20 text-amber-300'}`}>
                 {activeQrisOrder.status === 'EXPIRED'
                   ? 'KADALUARSA'
@@ -803,7 +803,7 @@ export default function POSPage() {
                   className="btn-primary"
                   style={{ width: '100%', background: 'linear-gradient(135deg, #10b981, #059669)' }}
                 >
-                  Simulasi Pembayaran Berhasil (Webhook)
+                  Konfirmasi Pembayaran Lunas
                 </button>
               )}
               <button
@@ -838,18 +838,10 @@ export default function POSPage() {
             <button
               type="button"
               onClick={() => setShowScannerModal(true)}
-              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md"
+              className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md"
             >
               <Scan size={15} />
               <span>Scan Barcode</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setThemeMode(themeMode === 'dark' ? 'light' : 'dark')}
-              className="btn-secondary"
-              style={{ padding: '8px 12px', fontSize: '0.75rem' }}
-            >
-              {themeMode === 'dark' ? '☀️ Light' : '🌙 Dark'}
             </button>
           </div>
         </div>
